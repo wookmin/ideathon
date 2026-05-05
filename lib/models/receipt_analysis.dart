@@ -234,6 +234,35 @@ class ReceiptAnalysis extends HiveObject {
   }) {
     final lower = text.toLowerCase();
     final amount = _guessTotalAmount(text);
+    final hasHangul = RegExp(r'[가-힣]').hasMatch(text);
+    final hasKoreanReceiptHints = [
+      '청구금액',
+      '받은금액',
+      '거스름돈',
+      '부가세',
+      '과세',
+      '면세',
+      '소계',
+      '결제',
+      '매장',
+      '카드',
+    ].any(lower.contains);
+    final hasForeignCurrencyHint = [
+      'usd',
+      'jpy',
+      'eur',
+      'thb',
+      'vnd',
+      'cny',
+      'sgd',
+      '\$',
+      '€',
+      '¥',
+      '달러',
+      '엔',
+      'baht',
+      'dong',
+    ].any(lower.contains);
 
     var currency = fallbackCurrency.toUpperCase();
     var countryCode = '';
@@ -251,6 +280,10 @@ class ReceiptAnalysis extends HiveObject {
       if (lower.contains('서울')) {
         city = '서울';
       }
+    } else if ((hasHangul && hasKoreanReceiptHints) || (hasHangul && !hasForeignCurrencyHint)) {
+      currency = 'KRW';
+      countryCode = 'KR';
+      country = '대한민국';
     } else if (lower.contains('¥') || lower.contains('jpy') || lower.contains('엔')) {
       currency = 'JPY';
       countryCode = 'JP';

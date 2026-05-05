@@ -80,6 +80,10 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
               data: (snapshot) {
                 final analysis = _analysis!;
                 final currency = _selectedCurrency ?? analysis.currency;
+                final currencyOptions = {
+                  ...ExchangeService.supportedCurrencies,
+                  currency,
+                }.toList();
                 final rate = snapshot.rateFor(currency);
                 final amountKrw = ref
                     .read(exchangeServiceProvider)
@@ -160,10 +164,11 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                                 ),
                               ),
                               const Spacer(),
-                              VerdictBadge(
-                                verdict: analysis.verdict,
-                                label: analysis.verdictLabel,
-                              ),
+                              if (!analysis.isFallback)
+                                VerdictBadge(
+                                  verdict: analysis.verdict,
+                                  label: analysis.verdictLabel,
+                                ),
                             ],
                           ),
                           const SizedBox(height: 18),
@@ -210,7 +215,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                                 DropdownButtonFormField<String>(
                                   initialValue: currency,
                                   dropdownColor: AppTheme.surface,
-                                  items: ExchangeService.supportedCurrencies
+                                  items: currencyOptions
                                       .map(
                                         (code) => DropdownMenuItem(
                                           value: code,
@@ -394,7 +399,9 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                               const SizedBox(width: 12),
                               VerdictBadge(
                                 verdict: analysis.verdict,
-                                label: '${analysis.verdictEmoji} ${analysis.verdictLabel}',
+                                label: analysis.isFallback
+                                    ? '분석 실패'
+                                    : '${analysis.verdictEmoji} ${analysis.verdictLabel}',
                               ),
                             ],
                           ),

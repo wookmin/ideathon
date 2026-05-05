@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
@@ -28,8 +27,6 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
   CameraController? _cameraController;
   bool _cameraReady = false;
   bool _busy = false;
-  bool _autoMode = false;
-  bool _autoCapturing = false;
   String _statusText = '카메라를 준비하고 있습니다...';
   String? _cameraError;
   Future<void>? _cameraInitFuture;
@@ -47,7 +44,6 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
       return;
     }
     if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
-      _autoMode = false;
       unawaited(_disposeCamera());
       return;
     }
@@ -64,22 +60,6 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
       _statusText = '카메라를 준비하고 있습니다...';
     });
 
-    var cameraStatus = await Permission.camera.status;
-    if (cameraStatus.isDenied) {
-      cameraStatus = await Permission.camera.request();
-    }
-    if (!cameraStatus.isGranted) {
-      if (mounted) {
-        setState(() {
-          _cameraError = '카메라 권한이 필요합니다.';
-          _statusText = cameraStatus.isPermanentlyDenied
-              ? '카메라 권한이 차단되었습니다. 설정에서 허용해 주세요.'
-              : '카메라 권한이 허용되지 않았습니다.';
-        });
-      }
-      return;
-    }
-
     try {
       final cameras = await CameraService.getCameras();
       final selected = cameras.where((camera) {
@@ -93,7 +73,7 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
 
       final controller = CameraController(
         selected,
-        ResolutionPreset.medium,
+        ResolutionPreset.high,
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
@@ -108,8 +88,21 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
       _cameraController = controller;
       setState(() {
         _cameraReady = true;
-        _statusText = '가이드에 맞춰 영수증을 비춰 주세요';
+        _statusText = '영수증을 가이드 라인에 맞춰 촬영해 주세요';
       });
+    } on CameraException catch (error) {
+      final cameraStatus = await Permission.camera.status;
+      if (mounted) {
+        setState(() {
+          _cameraReady = false;
+          _cameraError = '카메라를 열지 못했습니다.';
+          _statusText = _cameraStatusMessage(
+            permissionStatus: cameraStatus,
+            errorCode: error.code,
+            errorDescription: error.description,
+          );
+        });
+      }
     } catch (error) {
       if (mounted) {
         setState(() {
@@ -119,6 +112,31 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
         });
       }
     }
+  }
+
+  String _cameraStatusMessage({
+    required PermissionStatus permissionStatus,
+    required String errorCode,
+    String? errorDescription,
+  }) {
+    if (permissionStatus.isPermanentlyDenied) {
+      return '카메라 권한이 차단되었습니다. 설정에서 허용해 주세요.';
+    }
+    if (permissionStatus.isDenied || permissionStatus.isRestricted) {
+      return '카메라 권한이 허용되지 않았습니다.';
+    }
+    if (errorCode.contains('CameraAccessDenied')) {
+      return '카메라 접근이 거부되었습니다. iPhone 설정에서 권한을 다시 확인해 주세요.';
+    }
+    if (errorCode.contains('CameraAccessRestricted')) {
+      return '이 기기에서는 카메라 접근이 제한되어 있습니다.';
+    }
+    if (errorCode.contains('CameraAccess')) {
+      return '카메라 접근 오류가 발생했습니다. 설정 변경 후에는 flutter run으로 다시 연결해 주세요.';
+    }
+    return errorDescription?.trim().isNotEmpty == true
+        ? errorDescription!
+        : '카메라 초기화에 실패했습니다.';
   }
 
   Future<void> _disposeCamera() async {
@@ -134,7 +152,6 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
   Future<void> _handleGalleryPick() async {
     setState(() {
       _busy = true;
-      _autoMode = false;
       _statusText = '갤러리 불러오는 중...';
     });
     try {
@@ -162,7 +179,7 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
         setState(() {
           _busy = false;
           if (_cameraReady) {
-            _statusText = '가이드에 맞춰 영수증을 비춰 주세요';
+            _statusText = '영수증을 가이드 라인에 맞춰 촬영해 주세요';
           }
         });
       }
@@ -180,7 +197,6 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
     }
     setState(() {
       _busy = true;
-      _autoMode = false;
       _statusText = '영수증 촬영 중...';
     });
     try {
@@ -194,7 +210,7 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
         setState(() {
           _busy = false;
           if (_cameraReady) {
-            _statusText = '가이드에 맞춰 영수증을 비춰 주세요';
+            _statusText = '영수증을 가이드 라인에 맞춰 촬영해 주세요';
           }
         });
       }
@@ -212,116 +228,6 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
         builder: (_) => ReceiptScreen(imagePath: imagePath, ocrText: text),
       ),
     );
-  }
-
-  void _toggleAutoMode() {
-    if (_cameraController == null || !_cameraReady || _busy) {
-      if (mounted && !_busy) {
-        setState(() {
-          _statusText = '카메라 준비 후 자동 모드를 사용할 수 있습니다.';
-        });
-      }
-      return;
-    }
-    final next = !_autoMode;
-    setState(() {
-      _autoMode = next;
-      _statusText = next
-          ? '자동 모드: 텍스트가 읽히면 자동 촬영합니다.'
-          : '가이드에 맞춰 영수증을 비춰 주세요';
-    });
-    if (next) {
-      unawaited(_runAutoCaptureLoop());
-    }
-  }
-
-  Future<void> _runAutoCaptureLoop() async {
-    if (_autoCapturing) {
-      return;
-    }
-    _autoCapturing = true;
-    try {
-      while (mounted && _autoMode) {
-        if (_busy || !_cameraReady || _cameraController == null) {
-          await Future<void>.delayed(const Duration(milliseconds: 500));
-          continue;
-        }
-
-        setState(() => _statusText = '자동 모드: 영수증 텍스트 확인 중...');
-        await Future<void>.delayed(const Duration(milliseconds: 1200));
-        if (!mounted || !_autoMode || _busy) {
-          continue;
-        }
-
-        try {
-          final image = await _cameraController!.takePicture();
-          final text = await _ocrService.extractText(image.path);
-          if (!_looksLikeReceipt(text)) {
-            if (mounted && _autoMode) {
-              setState(() => _statusText = '자동 모드: 합계/통화를 다시 찾는 중...');
-            }
-            await _deleteIfPossible(image.path);
-            continue;
-          }
-
-          if (!mounted) {
-            return;
-          }
-          setState(() {
-            _busy = true;
-            _autoMode = false;
-            _statusText = '영수증을 감지해 자동 촬영했습니다.';
-          });
-          await Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => ReceiptScreen(imagePath: image.path, ocrText: text),
-            ),
-          );
-          if (!mounted) {
-            return;
-          }
-          setState(() {
-            _busy = false;
-            _statusText = '가이드에 맞춰 영수증을 비춰 주세요';
-          });
-        } catch (_) {
-          if (mounted && _autoMode) {
-            setState(() => _statusText = '자동 모드: 다시 시도하는 중...');
-          }
-        }
-      }
-    } finally {
-      _autoCapturing = false;
-    }
-  }
-
-  bool _looksLikeReceipt(String text) {
-    final normalized = text.trim().toLowerCase();
-    if (normalized.length < 24) {
-      return false;
-    }
-    final lineCount = normalized
-        .split('\n')
-        .where((line) => line.trim().isNotEmpty)
-        .length;
-    if (lineCount < 3) {
-      return false;
-    }
-    final hasAmountHint = RegExp(
-      r'(합계|총액|금액|total|subtotal|amount|원|krw|usd|jpy|eur|thb|vnd)',
-      caseSensitive: false,
-    ).hasMatch(normalized);
-    final hasNumber = RegExp(r'\d').hasMatch(normalized);
-    return hasAmountHint && hasNumber;
-  }
-
-  Future<void> _deleteIfPossible(String path) async {
-    try {
-      final file = File(path);
-      if (await file.exists()) {
-        await file.delete();
-      }
-    } catch (_) {}
   }
 
   @override
@@ -352,10 +258,10 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
             ),
             Expanded(
               child: Padding(
-                padding: AppTheme.screenPadding.copyWith(top: 8, bottom: 0),
+                padding: AppTheme.screenPadding.copyWith(top: 4, bottom: 0),
                 child: Container(
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(28),
+                    borderRadius: BorderRadius.circular(32),
                     gradient: const LinearGradient(
                       colors: [Color(0xFF111B6D), Color(0xFF232A7A), Color(0xFF111B6D)],
                       begin: Alignment.topLeft,
@@ -365,20 +271,13 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
                   child: Column(
                     children: [
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
-                        child: Row(
-                          children: [
-                            _CircleAction(
-                              icon: Icons.close_rounded,
-                              onTap: () => Navigator.of(context).maybePop(),
-                            ),
-                            const Spacer(),
-                            _CircleAction(
-                              icon: _autoMode ? Icons.auto_awesome : Icons.bolt_outlined,
-                              onTap: _toggleAutoMode,
-                              highlighted: _autoMode,
-                            ),
-                          ],
+                        padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: _RoundIconButton(
+                            icon: Icons.close_rounded,
+                            onTap: () => Navigator.of(context).maybePop(),
+                          ),
                         ),
                       ),
                       Padding(
@@ -430,31 +329,17 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
                           ),
                         ),
                       ],
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 14),
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 22),
+                          padding: const EdgeInsets.symmetric(horizontal: 18),
                           child: _buildPreview(context, isReady),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const ManualEntryScreen()),
-                          );
-                        },
-                        style: TextButton.styleFrom(
-                          backgroundColor: AppTheme.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        ),
-                        child: const Text('직접 입력하기'),
-                      ),
-                      const SizedBox(height: 18),
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 22),
+                        padding: const EdgeInsets.fromLTRB(28, 18, 28, 24),
                         child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             _BottomAction(
                               icon: Icons.image_rounded,
@@ -465,16 +350,16 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
                             GestureDetector(
                               onTap: _busy ? null : _handleManualCapture,
                               child: Container(
-                                width: 88,
-                                height: 88,
+                                width: 92,
+                                height: 92,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white24, width: 3),
+                                  border: Border.all(color: Colors.white24, width: 4),
                                 ),
                                 child: Center(
                                   child: Container(
-                                    width: 68,
-                                    height: 68,
+                                    width: 70,
+                                    height: 70,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       color: _busy ? Colors.white24 : Colors.white,
@@ -485,10 +370,17 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
                             ),
                             const Spacer(),
                             _BottomAction(
-                              icon: _autoMode ? Icons.auto_awesome : Icons.auto_awesome_outlined,
-                              label: '자동',
-                              onTap: _busy ? null : _toggleAutoMode,
-                              highlighted: _autoMode,
+                              icon: Icons.edit_note_rounded,
+                              label: '직접 입력',
+                              onTap: _busy
+                                  ? null
+                                  : () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) => const ManualEntryScreen(),
+                                        ),
+                                      );
+                                    },
                             ),
                           ],
                         ),
@@ -539,7 +431,7 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
         fit: StackFit.expand,
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(28),
             child: CameraPreview(_cameraController!),
           ),
           Positioned.fill(
@@ -564,27 +456,25 @@ class _PreviewShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFF19A7FF), width: 3),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: const Color(0xFF19A7FF), width: 3.5),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(26),
         child: child,
       ),
     );
   }
 }
 
-class _CircleAction extends StatelessWidget {
-  const _CircleAction({
+class _RoundIconButton extends StatelessWidget {
+  const _RoundIconButton({
     required this.icon,
     required this.onTap,
-    this.highlighted = false,
   });
 
   final IconData icon;
   final VoidCallback onTap;
-  final bool highlighted;
 
   @override
   Widget build(BuildContext context) {
@@ -592,16 +482,13 @@ class _CircleAction extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
       child: Ink(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: highlighted ? Colors.white : Colors.white24,
+        width: 52,
+        height: 52,
+        decoration: const BoxDecoration(
+          color: Colors.white24,
           shape: BoxShape.circle,
         ),
-        child: Icon(
-          icon,
-          color: highlighted ? AppTheme.primaryStrong : Colors.white,
-        ),
+        child: Icon(icon, color: Colors.white, size: 28),
       ),
     );
   }
@@ -612,35 +499,31 @@ class _BottomAction extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
-    this.highlighted = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
-  final bool highlighted;
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = highlighted ? Colors.white : Colors.white12;
-    final iconColor = highlighted ? AppTheme.primaryStrong : Colors.white;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(18),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Ink(
-            width: 54,
-            height: 54,
+            width: 58,
+            height: 58,
             decoration: BoxDecoration(
-              color: backgroundColor,
-              borderRadius: BorderRadius.circular(16),
+              color: Colors.white12,
+              borderRadius: BorderRadius.circular(18),
               border: Border.all(color: Colors.white12),
             ),
-            child: Icon(icon, color: iconColor),
+            child: Icon(icon, color: Colors.white),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text(
             label,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(

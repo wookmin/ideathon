@@ -28,6 +28,7 @@ class ExchangeService {
   static const _cacheKey = 'exchange_rates_cache_v1';
   static const _cacheDateKey = 'exchange_rates_cache_date_v1';
   static const supportedCurrencies = <String>[
+    'KRW',
     'USD',
     'JPY',
     'EUR',
