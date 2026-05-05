@@ -45,6 +45,9 @@ class GeminiService {
 }
 ''';
 
+  static const _maxRetries = 3;
+  static const _retryableStatusCodes = {503, 502, 429};
+
   Future<ReceiptAnalysis> analyzeReceipt({
     required String imagePath,
     required String ocrText,
@@ -59,78 +62,104 @@ class GeminiService {
       );
     }
 
-    try {
-      final bytes = await File(imagePath).readAsBytes();
-      final base64Image = base64Encode(bytes);
+    final bytes = await File(imagePath).readAsBytes();
+    final base64Image = base64Encode(bytes);
 
-      final response = await _dio.post<Map<String, dynamic>>(
-        'https://generativelanguage.googleapis.com/v1beta/models/$_model:generateContent?key=${Env.geminiApiKey}',
-        data: {
-          'contents': [
-            {
-              'parts': [
-                {
-                  'inline_data': {
-                    'mime_type': 'image/jpeg',
-                    'data': base64Image,
+    DioException? lastDioError;
+
+    for (var attempt = 0; attempt < _maxRetries; attempt++) {
+      if (attempt > 0) {
+        await Future<void>.delayed(Duration(seconds: 1 << attempt));
+      }
+
+      try {
+        final response = await _dio.post<Map<String, dynamic>>(
+          'https://generativelanguage.googleapis.com/v1beta/models/$_model:generateContent?key=${Env.geminiApiKey}',
+          data: {
+            'contents': [
+              {
+                'parts': [
+                  {
+                    'inline_data': {
+                      'mime_type': 'image/jpeg',
+                      'data': base64Image,
+                    },
                   },
-                },
-                {
-                  'text':
-                      '위치: $country $city\nOCR 텍스트: $ocrText\n\n아래 시스템 지시에 따라 분석하세요.',
-                },
+                  {
+                    'text':
+                        '위치: $country $city\nOCR 텍스트: $ocrText\n\n아래 시스템 지시에 따라 분석하세요.',
+                  },
+                ],
+              },
+            ],
+            'system_instruction': {
+              'parts': [
+                {'text': _systemPrompt},
               ],
             },
-          ],
-          'system_instruction': {
-            'parts': [
-              {'text': _systemPrompt},
-            ],
+            'generationConfig': {'responseMimeType': 'application/json'},
           },
-          'generationConfig': {'responseMimeType': 'application/json'},
-        },
-      );
+        );
 
-      final text =
-          (((response.data ?? const {})['candidates'] as List<dynamic>?)
-                      ?.firstOrNull
-                  as Map<String, dynamic>?)?['content']
-              as Map<String, dynamic>?;
-      final parts = text?['parts'] as List<dynamic>?;
-      final jsonText = parts?.firstOrNull is Map<String, dynamic>
-          ? (parts!.first as Map<String, dynamic>)['text'] as String? ?? '{}'
-          : '{}';
-      if (jsonText.trim().isEmpty || jsonText.trim() == '{}') {
+        final text =
+            (((response.data ?? const {})['candidates'] as List<dynamic>?)
+                        ?.firstOrNull
+                    as Map<String, dynamic>?)?['content']
+                as Map<String, dynamic>?;
+        final parts = text?['parts'] as List<dynamic>?;
+        final jsonText = parts?.firstOrNull is Map<String, dynamic>
+            ? (parts!.first as Map<String, dynamic>)['text'] as String? ?? '{}'
+            : '{}';
+        if (jsonText.trim().isEmpty || jsonText.trim() == '{}') {
+          return ReceiptAnalysis.fallback(
+            ocrText: ocrText,
+            failureReason: 'Gemini 응답에서 JSON 본문을 읽지 못했습니다.',
+            failureDetail:
+                'model=$_model, 후보 응답은 왔지만 content.parts[0].text 가 비어 있습니다.',
+          );
+        }
+        return ReceiptAnalysis.fromResponseText(jsonText);
+      } on DioException catch (error) {
+        final statusCode = error.response?.statusCode;
+        final isRetryable = _retryableStatusCodes.contains(statusCode) ||
+            error.type == DioExceptionType.connectionTimeout ||
+            error.type == DioExceptionType.receiveTimeout ||
+            error.type == DioExceptionType.connectionError;
+
+        if (isRetryable && attempt < _maxRetries - 1) {
+          lastDioError = error;
+          continue;
+        }
+        final responseData = error.response?.data;
         return ReceiptAnalysis.fallback(
           ocrText: ocrText,
-          failureReason: 'Gemini 응답에서 JSON 본문을 읽지 못했습니다.',
+          failureReason: _mapDioFailureReason(error),
           failureDetail:
-              'model=$_model, 후보 응답은 왔지만 content.parts[0].text 가 비어 있습니다.',
+              'model=$_model, status=$statusCode, type=${error.type}, response=${responseData ?? 'none'}',
+        );
+      } on FormatException catch (error) {
+        return ReceiptAnalysis.fallback(
+          ocrText: ocrText,
+          failureReason: 'Gemini 응답 JSON 파싱에 실패했습니다.',
+          failureDetail: error.message,
+        );
+      } catch (error) {
+        return ReceiptAnalysis.fallback(
+          ocrText: ocrText,
+          failureReason: '알 수 없는 오류로 AI 분석을 완료하지 못했습니다.',
+          failureDetail: error.toString(),
         );
       }
-      return ReceiptAnalysis.fromResponseText(jsonText);
-    } on DioException catch (error) {
-      final statusCode = error.response?.statusCode;
-      final responseData = error.response?.data;
-      return ReceiptAnalysis.fallback(
-        ocrText: ocrText,
-        failureReason: _mapDioFailureReason(error),
-        failureDetail:
-            'model=$_model, status=$statusCode, type=${error.type}, response=${responseData ?? 'none'}',
-      );
-    } on FormatException catch (error) {
-      return ReceiptAnalysis.fallback(
-        ocrText: ocrText,
-        failureReason: 'Gemini 응답 JSON 파싱에 실패했습니다.',
-        failureDetail: error.message,
-      );
-    } catch (error) {
-      return ReceiptAnalysis.fallback(
-        ocrText: ocrText,
-        failureReason: '알 수 없는 오류로 AI 분석을 완료하지 못했습니다.',
-        failureDetail: error.toString(),
-      );
     }
+
+    // 모든 재시도 소진
+    final statusCode = lastDioError?.response?.statusCode;
+    return ReceiptAnalysis.fallback(
+      ocrText: ocrText,
+      failureReason: _mapDioFailureReason(lastDioError!),
+      failureDetail:
+          'model=$_model, status=$statusCode, $_maxRetries회 재시도 모두 실패',
+    );
   }
 
   String _mapDioFailureReason(DioException error) {
@@ -145,7 +174,10 @@ class GeminiService {
       return 'Gemini 모델 또는 엔드포인트를 찾지 못했습니다.';
     }
     if (statusCode == 429) {
-      return 'Gemini API 쿼터를 초과했습니다.';
+      return 'Gemini API 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.';
+    }
+    if (statusCode == 503) {
+      return 'Gemini 서버가 일시적으로 사용 불가 상태입니다. 잠시 후 다시 시도해 주세요.';
     }
     if (statusCode != null && statusCode >= 500) {
       return 'Gemini 서버 오류가 발생했습니다.';

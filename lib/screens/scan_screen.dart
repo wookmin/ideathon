@@ -155,25 +155,20 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
       _statusText = '갤러리 불러오는 중...';
     });
     try {
-      var photosStatus = await Permission.photos.status;
-      if (photosStatus.isDenied) {
-        photosStatus = await Permission.photos.request();
-      }
-      if (!photosStatus.isGranted && !photosStatus.isLimited) {
-        if (mounted) {
-          setState(() {
-            _statusText = photosStatus.isPermanentlyDenied
-                ? '사진 접근 권한이 차단되었습니다. 설정에서 허용해 주세요.'
-                : '사진 접근 권한이 필요합니다.';
-          });
-        }
-        return;
-      }
       final image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
       if (image == null || !mounted) {
+        setState(() {
+          _statusText = '갤러리 선택을 취소했습니다.';
+        });
         return;
       }
       await _processImage(image.path);
+    } on PlatformException catch (error) {
+      if (mounted) {
+        setState(() {
+          _statusText = '사진 접근에 실패했습니다. ${error.message ?? ''}'.trim();
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {
