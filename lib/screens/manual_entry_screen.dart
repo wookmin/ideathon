@@ -127,6 +127,7 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
             TextFormField(
               controller: _countryController,
               decoration: const InputDecoration(labelText: '국가'),
+              maxLength: 50,
               validator: (value) =>
                   (value == null || value.trim().isEmpty) ? '국가를 입력해 주세요.' : null,
             ),
@@ -134,6 +135,7 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
             TextFormField(
               controller: _cityController,
               decoration: const InputDecoration(labelText: '도시'),
+              maxLength: 50,
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
@@ -166,11 +168,13 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
             TextFormField(
               controller: _memoController,
               decoration: const InputDecoration(labelText: '메모'),
+              maxLength: 200,
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _ocrController,
               maxLines: 5,
+              maxLength: 2000,
               decoration: const InputDecoration(
                 labelText: '영수증 원문 메모',
                 hintText: '품목이나 영수증 내용을 텍스트로 적어두면 나중에 검색하기 쉽습니다.',

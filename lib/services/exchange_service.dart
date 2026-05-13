@@ -62,6 +62,9 @@ class ExchangeService {
     }
 
     try {
+      // exchangerate-api.com은 헤더 인증을 지원하지 않아 키가 URL 경로에 포함됩니다.
+      // HTTPS를 통해 전송되므로 전송 중 노출 위험은 없지만,
+      // 서버 액세스 로그에 기록될 수 있음을 인지해야 합니다.
       final response = await _dio.get<Map<String, dynamic>>(
         'https://v6.exchangerate-api.com/v6/${Env.exchangeApiKey}/latest/KRW',
       );

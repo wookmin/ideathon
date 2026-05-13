@@ -1,0 +1,12 @@
+// 이 파일을 복사해 lib/config/env_local.dart 로 저장한 뒤 실제 API 키를 입력하세요.
+// env_local.dart 는 .gitignore 에 등록되어 있으므로 절대 커밋되지 않습니다.
+//
+// 대안: 빌드 시 --dart-define 플래그로 키를 주입할 수 있습니다.
+//   flutter run \
+//     --dart-define=GEMINI_API_KEY=your_gemini_key \
+//     --dart-define=EXCHANGE_API_KEY=your_exchange_key
+
+// ignore_for_file: constant_identifier_names
+
+const geminiApiKey = 'YOUR_GEMINI_API_KEY_HERE';
+const exchangeApiKey = 'YOUR_EXCHANGE_API_KEY_HERE';

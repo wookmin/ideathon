@@ -62,7 +62,37 @@ class GeminiService {
       );
     }
 
-    final bytes = await File(imagePath).readAsBytes();
+    final imageFile = File(imagePath);
+    final bytes = await imageFile.readAsBytes();
+
+    const maxImageBytes = 10 * 1024 * 1024; // 10 MB
+    if (bytes.length > maxImageBytes) {
+      return ReceiptAnalysis.fallback(
+        ocrText: ocrText,
+        failureReason: '이미지 크기가 너무 큽니다 (최대 10MB).',
+        failureDetail: 'imageSize=${bytes.length}, path=$imagePath',
+      );
+    }
+
+    // JPEG(FFD8FF) 또는 PNG(89504E47) 시그니처 검증
+    final isJpeg = bytes.length >= 3 &&
+        bytes[0] == 0xFF &&
+        bytes[1] == 0xD8 &&
+        bytes[2] == 0xFF;
+    final isPng = bytes.length >= 4 &&
+        bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4E &&
+        bytes[3] == 0x47;
+    if (!isJpeg && !isPng) {
+      return ReceiptAnalysis.fallback(
+        ocrText: ocrText,
+        failureReason: '지원하지 않는 이미지 형식입니다 (JPEG 또는 PNG만 허용).',
+        failureDetail: 'path=$imagePath',
+      );
+    }
+
+    final mimeType = isJpeg ? 'image/jpeg' : 'image/png';
     final base64Image = base64Encode(bytes);
 
     DioException? lastDioError;
@@ -74,14 +104,15 @@ class GeminiService {
 
       try {
         final response = await _dio.post<Map<String, dynamic>>(
-          'https://generativelanguage.googleapis.com/v1beta/models/$_model:generateContent?key=${Env.geminiApiKey}',
+          'https://generativelanguage.googleapis.com/v1beta/models/$_model:generateContent',
+          options: Options(headers: {'x-goog-api-key': Env.geminiApiKey}),
           data: {
             'contents': [
               {
                 'parts': [
                   {
                     'inline_data': {
-                      'mime_type': 'image/jpeg',
+                      'mime_type': mimeType,
                       'data': base64Image,
                     },
                   },
