@@ -10,6 +10,7 @@ import '../config/theme.dart';
 import '../services/camera_service.dart';
 import '../services/ocr_service.dart';
 import '../widgets/main_bottom_nav.dart';
+import 'card_sync_screen.dart';
 import 'manual_entry_screen.dart';
 import 'receipt_screen.dart';
 
@@ -341,7 +342,21 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
                               label: '갤러리',
                               onTap: _busy ? null : _handleGalleryPick,
                             ),
-                            const Spacer(),
+                            const Spacer(flex: 1),
+                            _BottomAction(
+                              icon: Icons.credit_card_rounded,
+                              label: '카드 불러오기',
+                              onTap: _busy
+                                  ? null
+                                  : () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) => const CardSyncScreen(),
+                                        ),
+                                      );
+                                    },
+                            ),
+                            const Spacer(flex: 1),
                             GestureDetector(
                               onTap: _busy ? null : _handleManualCapture,
                               child: Container(
@@ -363,7 +378,7 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
                                 ),
                               ),
                             ),
-                            const Spacer(),
+                            const Spacer(flex: 1),
                             _BottomAction(
                               icon: Icons.edit_note_rounded,
                               label: '직접 입력',

@@ -9,4 +9,8 @@ class Env {
     'EXCHANGE_API_KEY',
     defaultValue: local.exchangeApiKey,
   );
+  static const backendBaseUrl = String.fromEnvironment(
+    'BACKEND_BASE_URL',
+    defaultValue: 'http://127.0.0.1:4000',
+  );
 }

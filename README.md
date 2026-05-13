@@ -1,17 +1,30 @@
 # ideathon
 
-A new Flutter project.
+TripReceipt Flutter prototype with receipt OCR, exchange-rate conversion, and CODEF-backed card sync.
 
-## Getting Started
+## Run the Flutter app
 
-This project is a starting point for a Flutter application.
+```bash
+flutter run
+```
 
-A few resources to get you started if this is your first Flutter project:
+If you want to connect the app to the local backend, pass the backend base URL with `--dart-define`.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+```bash
+flutter run --dart-define=BACKEND_BASE_URL=http://127.0.0.1:4000
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Examples by device:
+
+- iOS simulator: `http://127.0.0.1:4000`
+- Android emulator: `http://10.0.2.2:4000`
+- Physical device: `http://<your-mac-ip>:4000`
+
+## Run the backend
+
+```bash
+cd backend
+cp .env.example .env
+npm install
+npm run dev
+```
