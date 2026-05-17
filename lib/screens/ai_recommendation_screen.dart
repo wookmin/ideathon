@@ -1,14 +1,11 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../config/app_colors.dart';
-import '../models/recommend_place.dart';
 import '../providers/recommendation_provider.dart';
 import '../widgets/category_chip_bar.dart';
 import '../widgets/main_bottom_nav.dart';
+import '../widgets/recommendation_map_view.dart';
 import '../widgets/recommendation_bottom_card.dart';
 import '../widgets/shimmer_map_loading.dart';
 
@@ -39,38 +36,39 @@ class _AIRecommendationScreenState
       backgroundColor: AppColors.background,
       bottomNavigationBar: const MainBottomNav(currentIndex: 2),
       body: provider.currentPosition == null
-          ? const Center(
-              child: CircularProgressIndicator(),
+          ? _RecommendationStatusView(
+              isLoading: provider.isLoading,
+              message: provider.errorMessage,
+              onRetry: () {
+                ref.read(recommendationProvider).initialize();
+              },
             )
           : Stack(
               children: [
-                GoogleMap(
-                  initialCameraPosition: CameraPosition(
-                    target: provider.currentPosition!,
-                    zoom: 15,
+                Positioned.fill(
+                  child: RecommendationMapView(
+                    currentPosition: provider.currentPosition!,
+                    places: provider.places,
+                    selectedPlace: provider.selectedPlace,
+                    onMapCreated: provider.onMapCreated,
+                    onPlaceTap: (place) {
+                      provider.selectPlace(place);
+                    },
                   ),
-                  myLocationEnabled: false,
-                  myLocationButtonEnabled: false,
-                  zoomControlsEnabled: false,
-                  compassEnabled: false,
-                  mapToolbarEnabled: false,
-                  onMapCreated: provider.onMapCreated,
-                  markers: _buildMarkers(provider),
                 ),
 
                 Positioned(
                   top: 0,
                   left: 0,
                   right: 0,
-                  child: ClipRect(
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(
-                        sigmaX: 18,
-                        sigmaY: 18,
-                      ),
-                      child: Container(
-                        height: 145,
-                        color: Colors.white.withValues(alpha: 0.78),
+                  child: Container(
+                    height: 145,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.92),
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.35),
+                        ),
                       ),
                     ),
                   ),
@@ -140,58 +138,133 @@ class _AIRecommendationScreenState
                   const Positioned.fill(
                     child: ShimmerMapLoading(),
                   ),
+
+                if (provider.errorMessage != null &&
+                    !provider.isLoading)
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: provider.selectedPlace != null ? 320 : 30,
+                    child: _InlineErrorCard(
+                      message: provider.errorMessage!,
+                      onRetry: () {
+                        ref
+                            .read(recommendationProvider)
+                            .fetchRecommendations();
+                      },
+                    ),
+                  ),
               ],
             ),
     );
   }
+}
 
-  Set<Marker> _buildMarkers(
-    RecommendationProvider provider,
-  ) {
-    final markers = <Marker>{};
+class _RecommendationStatusView extends StatelessWidget {
+  const _RecommendationStatusView({
+    required this.isLoading,
+    required this.message,
+    required this.onRetry,
+  });
 
-    markers.add(
-      Marker(
-        markerId: const MarkerId('current'),
-        position: provider.currentPosition!,
-        icon: BitmapDescriptor.defaultMarkerWithHue(
-          BitmapDescriptor.hueAzure,
-        ),
-      ),
-    );
+  final bool isLoading;
+  final String? message;
+  final VoidCallback onRetry;
 
-    for (final place in provider.places) {
-      markers.add(
-        Marker(
-          markerId: MarkerId(place.id),
-          position: place.position,
-          onTap: () {
-            provider.selectPlace(place);
-          },
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            _getMarkerHue(place),
-          ),
-        ),
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
       );
     }
 
-    return markers;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.location_off_rounded,
+              size: 54,
+              color: AppColors.primary,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              message ?? '추천 장소를 불러오지 못했어요.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 18),
+            ElevatedButton(
+              onPressed: onRetry,
+              child: const Text('다시 시도'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
+}
 
-  double _getMarkerHue(
-    RecommendPlace place,
-  ) {
-    switch (place.category.name) {
-      case 'restaurant':
-        return BitmapDescriptor.hueOrange;
-      case 'cafe':
-        return BitmapDescriptor.hueViolet;
-      case 'shopping':
-        return BitmapDescriptor.hueCyan;
-      case 'attraction':
-        return BitmapDescriptor.hueGreen;
-      default:
-        return BitmapDescriptor.hueAzure;
-    }
+class _InlineErrorCard extends StatelessWidget {
+  const _InlineErrorCard({
+    required this.message,
+    required this.onRetry,
+  });
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.info_outline_rounded,
+              color: AppColors.primary,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textPrimary,
+                  height: 1.4,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            TextButton(
+              onPressed: onRetry,
+              child: const Text('재시도'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

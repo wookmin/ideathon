@@ -40,7 +40,7 @@ class TripReceiptApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'TripReceipt',
+      title: 'JustAMoment',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.theme,
       home: const _AppBootstrapScreen(),

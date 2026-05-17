@@ -31,6 +31,11 @@ class TravelNotifier extends StateNotifier<List<Travel>> {
     _refresh();
   }
 
+  Future<void> delete(String id) async {
+    await _box.delete(id);
+    _refresh();
+  }
+
   void _refresh() {
     state = _sorted(_box.values.toList());
   }

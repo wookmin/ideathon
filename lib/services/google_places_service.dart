@@ -1,6 +1,6 @@
-import 'dart:convert';
-
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 
 import '../config/env.dart';
 import '../models/recommend_category.dart';
@@ -8,27 +8,33 @@ import '../models/recommend_place.dart';
 import '../utils/map_utils.dart';
 
 class GooglePlacesService {
+  GooglePlacesService(this._dio);
+
+  final Dio _dio;
+  static const _userIdKey = 'financial_api_user_id_v1';
+
+  String get _baseUrl => Env.backendBaseUrl.replaceAll(RegExp(r'/$'), '');
+
   Future<List<RecommendPlace>> fetchNearbyPlaces({
     required double latitude,
     required double longitude,
     required RecommendCategory category,
   }) async {
-    final uri = Uri.parse(
-      '${Env.backendBaseUrl}/api/v1/places/nearby'
-      '?lat=$latitude'
-      '&lng=$longitude'
-      '&type=${category.placeType}'
-      '&keyword=${Uri.encodeComponent(category.keyword)}',
+    final prefs = await SharedPreferences.getInstance();
+    final userId = _getOrCreateUserId(prefs);
+
+    final response = await _dio.get<Map<String, dynamic>>(
+      '$_baseUrl/api/v1/places/nearby',
+      queryParameters: {
+        'lat': latitude,
+        'lng': longitude,
+        'type': category.placeType,
+        'keyword': category.keyword,
+      },
+      options: Options(headers: {'x-user-id': userId}),
     );
 
-    final response = await http.get(uri);
-
-    if (response.statusCode != 200) {
-      throw Exception('Backend Places API Error: ${response.body}');
-    }
-
-    final data = jsonDecode(response.body);
-    final List places = data['places'] ?? [];
+    final List places = (response.data?['places'] as List?) ?? [];
 
     return places.map((placeJson) {
       final placeLat = (placeJson['lat'] ?? 0).toDouble();
@@ -49,6 +55,14 @@ class GooglePlacesService {
         walkTimeText: MapUtils.estimateWalkTime(distance),
       );
     }).toList();
+  }
+
+  String _getOrCreateUserId(SharedPreferences prefs) {
+    final existing = prefs.getString(_userIdKey);
+    if (existing != null && existing.isNotEmpty) return existing;
+    final generated = const Uuid().v4();
+    prefs.setString(_userIdKey, generated);
+    return generated;
   }
 
   String _generateMockAiReason(RecommendCategoryType type) {

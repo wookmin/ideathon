@@ -133,7 +133,7 @@ class RecordPresenter {
       case 'KRW':
         return '₩';
       default:
-        return '$currency ';
+        return '';
     }
   }
 

@@ -1,12 +1,20 @@
 {
   "hosting": {
-    "public": "public",
+    "site": "zeroback-5ff31-496614",
+    "public": "build/web",
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
     ],
     "rewrites": [
+      {
+        "source": "/api/**",
+        "run": {
+          "serviceId": "tripreceipt-backend",
+          "region": "asia-northeast3"
+        }
+      },
       {
         "source": "**",
         "destination": "/index.html"
