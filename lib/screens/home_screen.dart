@@ -65,7 +65,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 14, 24, 0),
                   child: _HomeHeader(
-                    title: 'OneShot',
+                    title: '멈칫',
                     travelTitle:
                         selectedTravel?.title ??
                         RecordPresenter.travelTitle(records),

@@ -28,7 +28,7 @@ class SettingsScreen extends StatelessWidget {
           _SettingTile(
             icon: Icons.info_outline_rounded,
             title: '앱 정보',
-            subtitle: 'OneShot travel expense prototype v0.1.0',
+            subtitle: 'mumchit travel expense prototype v0.1.0',
           ),
         ],
       ),

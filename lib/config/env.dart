@@ -19,6 +19,6 @@ class Env {
 
   static const backendBaseUrl = String.fromEnvironment(
     'BACKEND_BASE_URL',
-    defaultValue: 'http://127.0.0.1:4000',
+    defaultValue: 'https://tripreceipt-backend-593945546381.asia-northeast3.run.app',
   );
 }
