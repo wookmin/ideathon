@@ -1,13 +1,14 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../models/recommend_category.dart';
 import '../models/recommend_place.dart';
 import '../services/google_places_service.dart';
-import '../utils/location_service.dart' as loc;
 import 'exchange_provider.dart';
 
 class RecommendationProvider extends ChangeNotifier {
@@ -55,8 +56,30 @@ class RecommendationProvider extends ChangeNotifier {
 
   /// 현재 위치 가져오기
   Future<void> _getCurrentLocation() async {
-    final (lat, lng) = await loc.getCurrentLatLng();
-    currentPosition = LatLng(lat, lng);
+    if (!kIsWeb) {
+      final serviceEnabled =
+          await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        throw Exception('Location service disabled');
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.deniedForever) {
+        throw Exception('Location permanently denied');
+      }
+    }
+
+    final position = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+
+    currentPosition = LatLng(
+      position.latitude,
+      position.longitude,
+    );
   }
 
   /// 추천 불러오기

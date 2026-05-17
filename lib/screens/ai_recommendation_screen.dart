@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../config/app_colors.dart';
-import '../models/recommend_place.dart';
 import '../providers/recommendation_provider.dart';
 import '../widgets/category_chip_bar.dart';
 import '../widgets/main_bottom_nav.dart';
+import '../widgets/recommendation_map_view.dart';
 import '../widgets/recommendation_bottom_card.dart';
 import '../widgets/shimmer_map_loading.dart';
 
@@ -47,18 +46,14 @@ class _AIRecommendationScreenState
           : Stack(
               children: [
                 Positioned.fill(
-                  child: GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                      target: provider.currentPosition!,
-                      zoom: 15,
-                    ),
-                    myLocationEnabled: false,
-                    myLocationButtonEnabled: false,
-                    zoomControlsEnabled: false,
-                    compassEnabled: false,
-                    mapToolbarEnabled: false,
+                  child: RecommendationMapView(
+                    currentPosition: provider.currentPosition!,
+                    places: provider.places,
+                    selectedPlace: provider.selectedPlace,
                     onMapCreated: provider.onMapCreated,
-                    markers: _buildMarkers(provider),
+                    onPlaceTap: (place) {
+                      provider.selectPlace(place);
+                    },
                   ),
                 ),
 
@@ -162,56 +157,6 @@ class _AIRecommendationScreenState
               ],
             ),
     );
-  }
-
-  Set<Marker> _buildMarkers(
-    RecommendationProvider provider,
-  ) {
-    final markers = <Marker>{};
-
-    markers.add(
-      Marker(
-        markerId: const MarkerId('current'),
-        position: provider.currentPosition!,
-        icon: BitmapDescriptor.defaultMarkerWithHue(
-          BitmapDescriptor.hueAzure,
-        ),
-      ),
-    );
-
-    for (final place in provider.places) {
-      markers.add(
-        Marker(
-          markerId: MarkerId(place.id),
-          position: place.position,
-          onTap: () {
-            provider.selectPlace(place);
-          },
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            _getMarkerHue(place),
-          ),
-        ),
-      );
-    }
-
-    return markers;
-  }
-
-  double _getMarkerHue(
-    RecommendPlace place,
-  ) {
-    switch (place.category.name) {
-      case 'restaurant':
-        return BitmapDescriptor.hueOrange;
-      case 'cafe':
-        return BitmapDescriptor.hueViolet;
-      case 'shopping':
-        return BitmapDescriptor.hueCyan;
-      case 'attraction':
-        return BitmapDescriptor.hueGreen;
-      default:
-        return BitmapDescriptor.hueAzure;
-    }
   }
 }
 
