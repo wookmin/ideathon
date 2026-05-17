@@ -163,17 +163,18 @@ class _NewTripScreenState extends ConsumerState<NewTripScreen> {
             _SectionLabel(label: '여행 일정'),
             const SizedBox(height: 12),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Expanded(
+                Flexible(
                   child: _DateField(
                     value: _formatter.format(_startDate),
                     onTap: () => _pickDate(isStart: true),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Text('-', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(width: 12),
-                Expanded(
+                const SizedBox(width: 8),
+                Flexible(
                   child: _DateField(
                     value: _formatter.format(_endDate),
                     onTap: () => _pickDate(isStart: false),
@@ -181,7 +182,6 @@ class _NewTripScreenState extends ConsumerState<NewTripScreen> {
                 ),
               ],
             ),
-
             const SizedBox(height: 26),
             _SectionLabel(label: '총예산'),
             const SizedBox(height: 12),
@@ -283,8 +283,17 @@ class _DateField extends StatelessWidget {
         child: Row(
           children: [
             const Icon(Icons.calendar_month_outlined, color: Color(0xFF7B8095)),
-            const SizedBox(width: 10),
-            Text(value, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(width: 8),
+            Expanded(
+              child: FittedBox(
+                alignment: Alignment.centerLeft,
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  value,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+            ),
           ],
         ),
       ),

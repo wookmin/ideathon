@@ -7,9 +7,10 @@ import 'package:permission_handler/permission_handler.dart';
 import 'config/theme.dart';
 import 'models/receipt_analysis.dart';
 import 'models/receipt_record.dart';
-import 'providers/ledger_provider.dart';
-import 'providers/travel_provider.dart';
 import 'models/travel.dart';
+import 'providers/ledger_provider.dart';
+import 'providers/travel_selection_provider.dart';
+import 'providers/travel_provider.dart';
 import 'screens/home_screen.dart';
 import 'services/camera_service.dart';
 
@@ -28,6 +29,7 @@ Future<void> main() async {
 
   await Hive.openBox<ReceiptRecord>(ledgerBoxName);
   await Hive.openBox<Travel>(travelBoxName);
+  await Hive.openBox<String>(travelSelectionBoxName);
 
   runApp(const ProviderScope(child: TripReceiptApp()));
 }

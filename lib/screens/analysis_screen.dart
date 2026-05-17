@@ -6,76 +6,118 @@ import 'package:intl/intl.dart';
 
 import '../config/theme.dart';
 import '../models/receipt_record.dart';
+import '../models/travel.dart';
 import '../providers/ledger_provider.dart';
+import '../providers/travel_selection_provider.dart';
 import '../utils/record_presenter.dart';
+import '../widgets/header_menu_overlay.dart';
 import '../widgets/main_bottom_nav.dart';
 import 'home_screen.dart';
 import 'settings_screen.dart';
 import 'travel_list_screen.dart';
 
-class AnalysisScreen extends ConsumerWidget {
+class AnalysisScreen extends ConsumerStatefulWidget {
   const AnalysisScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AnalysisScreen> createState() => _AnalysisScreenState();
+}
+
+class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
+  bool _isMenuOpen = false;
+
+  @override
+  Widget build(BuildContext context) {
     final records = ref.watch(ledgerProvider);
-    final summary = _AnalysisSummary.fromRecords(records);
-    final budget = RecordPresenter.budgetGoal(records);
-    final displayCurrency = _displayCurrency(records);
-    final originalAmount = _displayOriginalAmount(records, displayCurrency);
+    final selectedTravel = ref.watch(effectiveTravelProvider);
+    final scopedRecords = scopedRecordsForTravel(records, selectedTravel);
+    final summary = _AnalysisSummary.fromRecords(scopedRecords);
+    final budget =
+        selectedTravel?.budgetKrw ?? RecordPresenter.budgetGoal(records);
+    final displayCurrency = _displayCurrency(scopedRecords, selectedTravel);
+    final originalAmount = _displayOriginalAmount(
+      scopedRecords,
+      displayCurrency,
+    );
 
     return Scaffold(
       backgroundColor: Colors.white,
       bottomNavigationBar: const MainBottomNav(currentIndex: 0),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(24, 10, 24, 28),
+        child: Stack(
           children: [
-            _AnalysisHeader(
-              onBackTap: () {
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const HomeScreen()),
-                  (route) => route.isFirst,
+            ListView(
+              padding: const EdgeInsets.fromLTRB(24, 10, 24, 28),
+              children: [
+                _AnalysisHeader(
+                  onBackTap: () {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const HomeScreen()),
+                      (route) => route.isFirst,
+                    );
+                  },
+                  onMenuTap: () {
+                    setState(() => _isMenuOpen = !_isMenuOpen);
+                  },
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  '여행 소비 내역 분석',
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  selectedTravel == null
+                      ? '소비 데이터를 자동으로 분석해 여행 중\n지출 흐름을 한눈에 보여드려요'
+                      : '${selectedTravel.title} 기준으로 지출 패턴을 분석해\n예산 흐름을 한눈에 보여드려요',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: const Color(0xFF98A2B3),
+                  ),
+                ),
+                const SizedBox(height: 22),
+                _AnalysisGauge(summary: summary),
+                const SizedBox(height: 10),
+                Text(
+                  'AI 인사이트',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleMedium?.copyWith(color: AppTheme.primary),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  summary.insight,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge?.copyWith(color: AppTheme.primary),
+                ),
+                const SizedBox(height: 22),
+                _CategorySpendCard(summary: summary),
+                const SizedBox(height: 20),
+                _AnalysisBudgetCard(
+                  originalAmount: originalAmount,
+                  currency: displayCurrency,
+                  originalSymbol: RecordPresenter.symbol(displayCurrency),
+                  usedKrw: summary.totalKrw,
+                  remainingKrw: math.max(0, budget - summary.totalKrw),
+                ),
+              ],
+            ),
+            HeaderMenuOverlay(
+              isOpen: _isMenuOpen,
+              dimTopOffset: 94,
+              onDismiss: () => setState(() => _isMenuOpen = false),
+              onTravelTap: () {
+                setState(() => _isMenuOpen = false);
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const TravelListScreen()),
                 );
               },
-            ),
-            const SizedBox(height: 20),
-            Text(
-              '여행 소비 내역 분석',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              '소비 데이터를 자동으로 분석해 여행 중\n지출 흐름을 한눈에 보여드려요',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyLarge?.copyWith(color: const Color(0xFF98A2B3)),
-            ),
-            const SizedBox(height: 22),
-            _AnalysisGauge(summary: summary),
-            const SizedBox(height: 10),
-            Text(
-              'AI 인사이트',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(color: AppTheme.primary),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              summary.insight,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyLarge?.copyWith(color: AppTheme.primary),
-            ),
-            const SizedBox(height: 22),
-            _CategorySpendCard(summary: summary),
-            const SizedBox(height: 20),
-            _AnalysisBudgetCard(
-              originalAmount: originalAmount,
-              currency: displayCurrency,
-              originalSymbol: RecordPresenter.symbol(displayCurrency),
-              usedKrw: summary.totalKrw,
-              remainingKrw: math.max(0, budget - summary.totalKrw),
+              onSettingsTap: () {
+                setState(() => _isMenuOpen = false);
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                );
+              },
             ),
           ],
         ),
@@ -83,32 +125,40 @@ class AnalysisScreen extends ConsumerWidget {
     );
   }
 
-  String _displayCurrency(List<ReceiptRecord> records) {
+  String _displayCurrency(List<ReceiptRecord> records, Travel? selectedTravel) {
     for (final record in records) {
       if (record.currency != 'KRW') {
         return record.currency;
       }
     }
-    return records.isEmpty ? 'EUR' : records.first.currency;
+    if (selectedTravel != null &&
+        selectedTravel.exchangeTargetCurrency.isNotEmpty) {
+      return selectedTravel.exchangeTargetCurrency;
+    }
+    if (selectedTravel != null &&
+        selectedTravel.exchangeSourceCurrency.isNotEmpty) {
+      return selectedTravel.exchangeSourceCurrency;
+    }
+    return records.isEmpty ? 'KRW' : records.first.currency;
   }
 
   double _displayOriginalAmount(List<ReceiptRecord> records, String currency) {
     final matching = records.where((record) => record.currency == currency);
-    final total = matching.fold<double>(
+    return matching.fold<double>(
       0,
       (sum, record) =>
           sum +
           record.originalAmount +
           record.originalAmount * (record.tipPct / 100),
     );
-    return total == 0 ? 985.42 : total;
   }
 }
 
 class _AnalysisHeader extends StatelessWidget {
-  const _AnalysisHeader({required this.onBackTap});
+  const _AnalysisHeader({required this.onBackTap, required this.onMenuTap});
 
   final VoidCallback onBackTap;
+  final VoidCallback onMenuTap;
 
   @override
   Widget build(BuildContext context) {
@@ -122,60 +172,8 @@ class _AnalysisHeader extends StatelessWidget {
           constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
         ),
         const Spacer(),
-        _HeaderMenuButton(),
+        HeaderMenuToggleButton(onTap: onMenuTap),
       ],
-    );
-  }
-}
-
-class _HeaderMenuButton extends StatelessWidget {
-  const _HeaderMenuButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return PopupMenuButton<_HeaderMenuAction>(
-      tooltip: '메뉴',
-      offset: const Offset(-8, 46),
-      color: Colors.white,
-      elevation: 12,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
-      onSelected: (value) {
-        final route = switch (value) {
-          _HeaderMenuAction.travel => MaterialPageRoute(
-            builder: (_) => const TravelListScreen(),
-          ),
-          _HeaderMenuAction.settings => MaterialPageRoute(
-            builder: (_) => const SettingsScreen(),
-          ),
-        };
-        Navigator.of(context).push(route);
-      },
-      itemBuilder: (context) => [
-        PopupMenuItem(
-          value: _HeaderMenuAction.travel,
-          height: 48,
-          child: Text(
-            '나의 여행 목록',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(color: AppTheme.primary),
-          ),
-        ),
-        PopupMenuItem(
-          value: _HeaderMenuAction.settings,
-          height: 48,
-          child: Text(
-            '환경 설정',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(color: AppTheme.primary),
-          ),
-        ),
-      ],
-      child: const Padding(
-        padding: EdgeInsets.all(4),
-        child: Icon(Icons.menu_rounded, size: 32, color: AppTheme.primary),
-      ),
     );
   }
 }
@@ -507,5 +505,3 @@ class _CategoryAmount {
 
   double get percent => ratio * 100;
 }
-
-enum _HeaderMenuAction { travel, settings }
