@@ -155,7 +155,7 @@ class RecordPresenter {
   static double budgetGoal(List<ReceiptRecord> records) {
     final total = totalSpend(records);
     if (total <= 0) {
-      return 500000;
+      return 0;
     }
     return (total * 1.4).clamp(500000, 10000000);
   }
