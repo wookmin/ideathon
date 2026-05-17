@@ -179,8 +179,6 @@ class RecommendationProvider extends ChangeNotifier {
 
 /// Riverpod Provider
 final recommendationProvider =
-    ChangeNotifierProvider<
-      RecommendationProvider
-    >(
+    ChangeNotifierProvider<RecommendationProvider>(
   (ref) => RecommendationProvider(),
 );

@@ -1,5 +1,6 @@
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import '../config/env.dart';
 import 'recommend_category.dart';
 
 class RecommendPlace {
@@ -55,8 +56,8 @@ class RecommendPlace {
     required String distanceText,
     required String walkTimeText,
   }) {
-    final geometry = json['geometry'];
-    final location = geometry['location'];
+    final geometry = json['geometry'] ?? {};
+    final location = geometry['location'] ?? {};
 
     return RecommendPlace(
       id: json['place_id'] ?? '',
@@ -77,20 +78,50 @@ class RecommendPlace {
     );
   }
 
+  factory RecommendPlace.fromBackendPlace({
+    required Map<String, dynamic> json,
+    required RecommendCategoryType category,
+    required String aiReason,
+    required String distanceText,
+    required String walkTimeText,
+  }) {
+    final photoUrl = json['photoUrl'];
+
+    return RecommendPlace(
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      category: category,
+      position: LatLng(
+        (json['lat'] ?? 0).toDouble(),
+        (json['lng'] ?? 0).toDouble(),
+      ),
+      rating: (json['rating'] ?? 0).toDouble(),
+      reviewCount: json['reviewCount'] ?? 0,
+      priceLevel: _convertPriceLevel(json['priceLevel']),
+      distanceText: distanceText,
+      walkTimeText: walkTimeText,
+      aiReason: aiReason,
+      imageUrl: photoUrl != null
+          ? '${Env.backendBaseUrl}$photoUrl'
+          : 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=1200&auto=format&fit=crop',
+      description: json['address'] ?? '',
+    );
+  }
+
   static String _convertPriceLevel(dynamic level) {
-    if (level == null) return '₩₩';
+    if (level == null) return '가격이 적당함';
 
     switch (level) {
       case 1:
-        return '₩';
+        return '가격이 저렴함';
       case 2:
-        return '₩₩';
+        return '가격이 적당함';
       case 3:
-        return '₩₩₩';
+        return '가격이 조금 나감';
       case 4:
-        return '₩₩₩₩';
+        return '가격이 비쌈';
       default:
-        return '₩₩';
+        return '가격이 적당함';
     }
   }
 }

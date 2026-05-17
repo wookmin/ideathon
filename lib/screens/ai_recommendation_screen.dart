@@ -1,8 +1,8 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:provider/provider.dart';
 
 import '../config/app_colors.dart';
 import '../models/recommend_place.dart';
@@ -12,159 +12,136 @@ import '../widgets/main_bottom_nav.dart';
 import '../widgets/recommendation_bottom_card.dart';
 import '../widgets/shimmer_map_loading.dart';
 
-class AIRecommendationScreen extends StatefulWidget {
+class AIRecommendationScreen extends ConsumerStatefulWidget {
   const AIRecommendationScreen({super.key});
 
   @override
-  State<AIRecommendationScreen> createState() =>
+  ConsumerState<AIRecommendationScreen> createState() =>
       _AIRecommendationScreenState();
 }
 
 class _AIRecommendationScreenState
-    extends State<AIRecommendationScreen> {
+    extends ConsumerState<AIRecommendationScreen> {
   @override
   void initState() {
     super.initState();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context
-          .read<RecommendationProvider>()
-          .initialize();
+      ref.read(recommendationProvider).initialize();
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final provider = ref.watch(recommendationProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       bottomNavigationBar: const MainBottomNav(currentIndex: 2),
-      body: Consumer<RecommendationProvider>(
-        builder: (context, provider, child) {
-          if (provider.currentPosition == null) {
-            return const Center(
+      body: provider.currentPosition == null
+          ? const Center(
               child: CircularProgressIndicator(),
-            );
-          }
-
-          return Stack(
-            children: [
-              /// MAP
-              GoogleMap(
-                initialCameraPosition: CameraPosition(
-                  target: provider.currentPosition!,
-                  zoom: 15,
-                ),
-                myLocationEnabled: false,
-                myLocationButtonEnabled: false,
-                zoomControlsEnabled: false,
-                compassEnabled: false,
-                mapToolbarEnabled: false,
-                onMapCreated: provider.onMapCreated,
-                markers: _buildMarkers(provider),
-              ),
-
-              /// TOP BLUR
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: ClipRect(
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(
-                      sigmaX: 18,
-                      sigmaY: 18,
-                    ),
-                    child: Container(
-                      height: 145,
-                      color: Colors.white.withValues(alpha: 0.78),
-                    ),
+            )
+          : Stack(
+              children: [
+                GoogleMap(
+                  initialCameraPosition: CameraPosition(
+                    target: provider.currentPosition!,
+                    zoom: 15,
                   ),
+                  myLocationEnabled: false,
+                  myLocationButtonEnabled: false,
+                  zoomControlsEnabled: false,
+                  compassEnabled: false,
+                  mapToolbarEnabled: false,
+                  onMapCreated: provider.onMapCreated,
+                  markers: _buildMarkers(provider),
                 ),
-              ),
 
-              /// CATEGORY
-              SafeArea(
-                child: Padding(
-                  padding:
-                      const EdgeInsets.only(top: 14),
-                  child: Column(
-                    children: [
-                      CategoryChipBar(
-                        selectedCategory:
-                            provider.selectedCategory,
-                        onSelected: (category) {
-                          provider.changeCategory(
-                            category,
-                          );
-                        },
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: ClipRect(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(
+                        sigmaX: 18,
+                        sigmaY: 18,
                       ),
-                    ],
+                      child: Container(
+                        height: 145,
+                        color: Colors.white.withValues(alpha: 0.78),
+                      ),
+                    ),
                   ),
                 ),
-              ),
 
-              /// CURRENT LOCATION BUTTON
-              Positioned(
-                right: 20,
-                bottom:
-                    provider.selectedPlace != null
-                        ? 290
-                        : 30,
-                child: GestureDetector(
-                  onTap: () {
-                    provider.moveToCurrentLocation();
-                  },
-                  child: AnimatedContainer(
-                    duration:
-                        const Duration(milliseconds: 250),
-                    width: 58,
-                    height: 58,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 18,
-                          offset: const Offset(0, 8),
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 14),
+                    child: Column(
+                      children: [
+                        CategoryChipBar(
+                          selectedCategory: provider.selectedCategory,
+                          onSelected: (category) {
+                            provider.changeCategory(category);
+                          },
                         ),
                       ],
                     ),
-                    child: const Icon(
-                      Icons.my_location_rounded,
-                      color: AppColors.primary,
-                    ),
                   ),
                 ),
-              ),
 
-              /// BOTTOM CARD
-              if (provider.selectedPlace != null)
                 Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: AnimatedSwitcher(
-                    duration:
-                        const Duration(milliseconds: 280),
-                    child: RecommendationBottomCard(
-                      key: ValueKey(
-                        provider.selectedPlace!.id,
+                  right: 20,
+                  bottom: provider.selectedPlace != null ? 290 : 30,
+                  child: GestureDetector(
+                    onTap: () {
+                      provider.moveToCurrentLocation();
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      width: 58,
+                      height: 58,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 18,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
                       ),
-                      place: provider.selectedPlace!,
+                      child: const Icon(
+                        Icons.my_location_rounded,
+                        color: AppColors.primary,
+                      ),
                     ),
                   ),
                 ),
 
-              /// SHIMMER LOADING
-              if (provider.isLoading)
-                const Positioned.fill(
-                  child: ShimmerMapLoading(),
-                ),
-            ],
-          );
-        },
-      ),
+                if (provider.selectedPlace != null)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 280),
+                      child: RecommendationBottomCard(
+                        key: ValueKey(provider.selectedPlace!.id),
+                        place: provider.selectedPlace!,
+                      ),
+                    ),
+                  ),
+
+                if (provider.isLoading)
+                  const Positioned.fill(
+                    child: ShimmerMapLoading(),
+                  ),
+              ],
+            ),
     );
   }
 
@@ -173,7 +150,6 @@ class _AIRecommendationScreenState
   ) {
     final markers = <Marker>{};
 
-    /// CURRENT LOCATION
     markers.add(
       Marker(
         markerId: const MarkerId('current'),
@@ -184,7 +160,6 @@ class _AIRecommendationScreenState
       ),
     );
 
-    /// RECOMMEND PLACE
     for (final place in provider.places) {
       markers.add(
         Marker(
@@ -209,16 +184,12 @@ class _AIRecommendationScreenState
     switch (place.category.name) {
       case 'restaurant':
         return BitmapDescriptor.hueOrange;
-
       case 'cafe':
         return BitmapDescriptor.hueViolet;
-
       case 'shopping':
         return BitmapDescriptor.hueCyan;
-
       case 'attraction':
         return BitmapDescriptor.hueGreen;
-
       default:
         return BitmapDescriptor.hueAzure;
     }

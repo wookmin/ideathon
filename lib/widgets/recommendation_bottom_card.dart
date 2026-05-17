@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../config/app_colors.dart';
+import '../models/recommend_category.dart';
 import '../models/recommend_place.dart';
 
 class RecommendationBottomCard extends StatelessWidget {
@@ -14,7 +15,7 @@ class RecommendationBottomCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 255,
+      height: 285,
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -39,19 +40,22 @@ class RecommendationBottomCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(99),
               ),
             ),
-
             const SizedBox(height: 16),
 
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
-                  child: Image.network(
-                    place.imageUrl,
-                    width: 92,
-                    height: 92,
-                    fit: BoxFit.cover,
+                Container(
+                  width: 76,
+                  height: 76,
+                  decoration: BoxDecoration(
+                    color: _getCategoryColor(place.category).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  child: Icon(
+                    _getCategoryIcon(place.category),
+                    color: _getCategoryColor(place.category),
+                    size: 34,
                   ),
                 ),
 
@@ -59,8 +63,7 @@ class RecommendationBottomCard extends StatelessWidget {
 
                 Expanded(
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         place.name,
@@ -72,43 +75,19 @@ class RecommendationBottomCard extends StatelessWidget {
                           color: AppColors.textPrimary,
                         ),
                       ),
-
                       const SizedBox(height: 8),
 
-                      Row(
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 6,
                         children: [
-                          const Icon(
-                            Icons.location_on_rounded,
-                            size: 16,
-                            color: AppColors.textSecondary,
+                          _InfoChip(
+                            icon: Icons.location_on_rounded,
+                            text: place.distanceText,
                           ),
-
-                          const SizedBox(width: 4),
-
-                          Text(
-                            place.distanceText,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-
-                          const SizedBox(width: 10),
-
-                          const Icon(
-                            Icons.directions_walk_rounded,
-                            size: 16,
-                            color: AppColors.textSecondary,
-                          ),
-
-                          const SizedBox(width: 4),
-
-                          Text(
-                            place.walkTimeText,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: AppColors.textSecondary,
-                            ),
+                          _InfoChip(
+                            icon: Icons.directions_walk_rounded,
+                            text: place.walkTimeText,
                           ),
                         ],
                       ),
@@ -118,55 +97,40 @@ class RecommendationBottomCard extends StatelessWidget {
                       Row(
                         children: [
                           Container(
-                            padding:
-                                const EdgeInsets.symmetric(
+                            padding: const EdgeInsets.symmetric(
                               horizontal: 10,
                               vertical: 5,
                             ),
                             decoration: BoxDecoration(
-                              color:
-                                  AppColors.primaryLight,
-                              borderRadius:
-                                  BorderRadius.circular(
-                                999,
-                              ),
+                              color: AppColors.primaryLight,
+                              borderRadius: BorderRadius.circular(999),
                             ),
                             child: Row(
                               children: [
                                 const Icon(
                                   Icons.star_rounded,
-                                  color:
-                                      Color(0xFFFFB800),
+                                  color: Color(0xFFFFB800),
                                   size: 16,
                                 ),
-
                                 const SizedBox(width: 4),
-
                                 Text(
                                   '${place.rating}',
-                                  style:
-                                      const TextStyle(
-                                    fontWeight:
-                                        FontWeight.w600,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
                                     fontSize: 13,
-                                    color: AppColors
-                                        .textPrimary,
+                                    color: AppColors.textPrimary,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-
                           const SizedBox(width: 10),
-
                           Text(
                             place.priceLevel,
                             style: const TextStyle(
                               fontSize: 14,
-                              fontWeight:
-                                  FontWeight.w700,
-                              color:
-                                  AppColors.primary,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
                             ),
                           ),
                         ],
@@ -187,16 +151,14 @@ class RecommendationBottomCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(18),
               ),
               child: Row(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
                     width: 32,
                     height: 32,
                     decoration: BoxDecoration(
                       color: AppColors.primary,
-                      borderRadius:
-                          BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
                       Icons.auto_awesome_rounded,
@@ -204,9 +166,7 @@ class RecommendationBottomCard extends StatelessWidget {
                       size: 18,
                     ),
                   ),
-
                   const SizedBox(width: 12),
-
                   Expanded(
                     child: Text(
                       place.aiReason,
@@ -232,13 +192,11 @@ class RecommendationBottomCard extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: () {},
                 style: ElevatedButton.styleFrom(
-                  backgroundColor:
-                      AppColors.primary,
+                  backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                 ),
                 child: const Text(
@@ -253,6 +211,64 @@ class RecommendationBottomCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  IconData _getCategoryIcon(RecommendCategoryType type) {
+    switch (type) {
+      case RecommendCategoryType.restaurant:
+        return Icons.restaurant_rounded;
+      case RecommendCategoryType.cafe:
+        return Icons.local_cafe_rounded;
+      case RecommendCategoryType.shopping:
+        return Icons.shopping_bag_rounded;
+      case RecommendCategoryType.attraction:
+        return Icons.attractions_rounded;
+    }
+  }
+
+  Color _getCategoryColor(RecommendCategoryType type) {
+    switch (type) {
+      case RecommendCategoryType.restaurant:
+        return AppColors.restaurant;
+      case RecommendCategoryType.cafe:
+        return AppColors.cafe;
+      case RecommendCategoryType.shopping:
+        return AppColors.shopping;
+      case RecommendCategoryType.attraction:
+        return AppColors.attraction;
+    }
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _InfoChip({
+    required this.icon,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          size: 16,
+          color: AppColors.textSecondary,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: const TextStyle(
+            fontSize: 13,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ],
     );
   }
 }
