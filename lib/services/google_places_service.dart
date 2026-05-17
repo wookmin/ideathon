@@ -1,12 +1,13 @@
 import 'dart:convert';
-
+import '../config/env.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/recommend_category.dart';
 import '../models/recommend_place.dart';
 
 class GooglePlacesService {
-  static const String _apiKey = 'YOUR_GOOGLE_PLACES_API_KEY';
+
+  final String _apiKey = Env.googlePlacesApiKey;
 
   static const String _baseUrl =
       'https://maps.googleapis.com/maps/api/place/nearbysearch/json';
