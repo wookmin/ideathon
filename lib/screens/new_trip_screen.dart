@@ -181,66 +181,7 @@ class _NewTripScreenState extends ConsumerState<NewTripScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 34),
-            _SectionLabel(label: '환전 정보 입력'),
-            const SizedBox(height: 18),
-            Text('환전 전 금액', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _InputField(
-                    controller: _exchangeSourceAmountController,
-                    hintText: '보유한 원화 (예: 1,000,000)',
-                    icon: Icons.payments_outlined,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 112,
-                  child: _CurrencyField(
-                    value: _sourceCurrency,
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() => _sourceCurrency = value);
-                      }
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 22),
-            Text('환전 후 금액', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _InputField(
-                    controller: _exchangeTargetAmountController,
-                    hintText: '실제 받은 EUR (예: 100,000)',
-                    icon: Icons.currency_exchange_rounded,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 112,
-                  child: _CurrencyField(
-                    value: _targetCurrency,
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() => _targetCurrency = value);
-                      }
-                    },
-                  ),
-                ),
-              ],
-            ),
+
             const SizedBox(height: 26),
             _SectionLabel(label: '총예산'),
             const SizedBox(height: 12),
@@ -257,33 +198,6 @@ class _NewTripScreenState extends ConsumerState<NewTripScreen> {
                 }
                 return _parseNumber(value) == null ? '숫자 형식으로 입력해 주세요.' : null;
               },
-            ),
-            const SizedBox(height: 18),
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    Icons.info_outline_rounded,
-                    color: AppTheme.primary,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      '입력한 환전 기준으로 실제 체감 소비 금액을 계산해드려요. 일반 환율이 아닌, 내가 실제 환전한 기준으로 계산됩니다.',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyLarge?.copyWith(height: 1.5),
-                    ),
-                  ),
-                ],
-              ),
             ),
             const SizedBox(height: 28),
             ElevatedButton.icon(
