@@ -1,17 +1,22 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/recommend_category.dart';
 import '../models/recommend_place.dart';
 import '../services/google_places_service.dart';
+import 'exchange_provider.dart';
 
 class RecommendationProvider extends ChangeNotifier {
-  final GooglePlacesService _placesService =
-      GooglePlacesService();
+  RecommendationProvider(SharedPreferences? prefs, Dio dio)
+      : _placesService = prefs != null ? GooglePlacesService(prefs, dio) : null;
+
+  final GooglePlacesService? _placesService;
 
   GoogleMapController? mapController;
 
@@ -90,7 +95,7 @@ class RecommendationProvider extends ChangeNotifier {
 
   /// 추천 불러오기
   Future<void> fetchRecommendations() async {
-    if (currentPosition == null) return;
+    if (currentPosition == null || _placesService == null) return;
 
     isLoading = true;
 
@@ -180,5 +185,9 @@ class RecommendationProvider extends ChangeNotifier {
 /// Riverpod Provider
 final recommendationProvider =
     ChangeNotifierProvider<RecommendationProvider>(
-  (ref) => RecommendationProvider(),
+  (ref) {
+    final prefs = ref.watch(sharedPreferencesProvider).valueOrNull;
+    final dio = ref.watch(dioProvider);
+    return RecommendationProvider(prefs, dio);
+  },
 );
