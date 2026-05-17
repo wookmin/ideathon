@@ -6,8 +6,11 @@ import 'package:intl/intl.dart';
 
 import '../config/theme.dart';
 import '../models/receipt_record.dart';
+import '../models/travel.dart';
 import '../providers/ledger_provider.dart';
+import '../providers/travel_selection_provider.dart';
 import '../utils/record_presenter.dart';
+import '../widgets/header_menu_overlay.dart';
 import '../widgets/main_bottom_nav.dart';
 import 'ledger_detail_screen.dart';
 import 'ledger_screen.dart';
@@ -16,19 +19,32 @@ import 'scan_screen.dart';
 import 'settings_screen.dart';
 import 'travel_list_screen.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  bool _isMenuOpen = false;
+
+  @override
+  Widget build(BuildContext context) {
     final records = ref.watch(ledgerProvider);
-    final recent = records.take(2).toList();
-    final totalKrw = RecordPresenter.totalSpend(records);
-    final budget = RecordPresenter.budgetGoal(records);
+    final selectedTravel = ref.watch(effectiveTravelProvider);
+    final scopedRecords = scopedRecordsForTravel(records, selectedTravel);
+    final recent = scopedRecords.take(2).toList();
+    final totalKrw = RecordPresenter.totalSpend(scopedRecords);
+    final budget =
+        selectedTravel?.budgetKrw ?? RecordPresenter.budgetGoal(records);
     final progress = budget <= 0 ? 0.0 : (totalKrw / budget).clamp(0.0, 0.999);
-    final latest = records.isEmpty ? null : records.first;
-    final displayCurrency = _displayCurrency(records);
-    final originalAmount = _displayOriginalAmount(records, displayCurrency);
+    final latest = scopedRecords.isEmpty ? null : scopedRecords.first;
+    final displayCurrency = _displayCurrency(scopedRecords, selectedTravel);
+    final originalAmount = _displayOriginalAmount(
+      scopedRecords,
+      displayCurrency,
+    );
     final originalSymbol = RecordPresenter.symbol(displayCurrency);
 
     return Scaffold(
@@ -42,79 +58,131 @@ class HomeScreen extends ConsumerWidget {
       ),
       bottomNavigationBar: const MainBottomNav(currentIndex: 1),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(24, 14, 24, 28),
+        child: Stack(
           children: [
-            _HomeHeader(
-              title: 'OneShot',
-              travelTitle: RecordPresenter.travelTitle(records),
-              period: RecordPresenter.travelDateRange(records),
-              status: RecordPresenter.statusLabel(records),
-            ),
-            const SizedBox(height: 22),
-            _BudgetGauge(progress: progress),
-            const SizedBox(height: 22),
-            _BudgetCard(
-              originalAmount: originalAmount,
-              originalSymbol: originalSymbol,
-              currency: displayCurrency,
-              usedKrw: totalKrw,
-              remainingKrw: math.max(0, budget - totalKrw),
-            ),
-            const SizedBox(height: 32),
-            Row(
+            Column(
               children: [
-                Text('최근 지출 내역', style: Theme.of(context).textTheme.titleLarge),
-                const Spacer(),
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const LedgerScreen()),
-                    );
-                  },
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppTheme.primary,
-                    padding: EdgeInsets.zero,
-                  ),
-                  child: const Text('전체보기'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (recent.isEmpty)
-              _EmptyRecentCard(onTap: () => _showAddSheet(context))
-            else
-              ...recent.map(
-                (record) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _RecentExpenseTile(
-                    record: record,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => LedgerDetailScreen(record: record),
-                        ),
-                      );
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 14, 24, 0),
+                  child: _HomeHeader(
+                    title: 'OneShot',
+                    travelTitle:
+                        selectedTravel?.title ??
+                        RecordPresenter.travelTitle(records),
+                    period: selectedTravel != null
+                        ? displayPeriodForTravel(selectedTravel)
+                        : RecordPresenter.travelDateRange(records),
+                    status: selectedTravel != null
+                        ? displayStatusForTravel(selectedTravel)
+                        : RecordPresenter.statusLabel(records),
+                    onMenuTap: () {
+                      setState(() => _isMenuOpen = !_isMenuOpen);
                     },
                   ),
                 ),
-              ),
-            const SizedBox(height: 24),
-            if (latest != null)
-              _TravelSummaryCard(record: latest)
-            else
-              const _TravelPlaceholderCard(),
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(24, 22, 24, 28),
+                    children: [
+                      _BudgetGauge(progress: progress),
+                      const SizedBox(height: 22),
+                      _BudgetCard(
+                        originalAmount: originalAmount,
+                        originalSymbol: originalSymbol,
+                        currency: displayCurrency,
+                        usedKrw: totalKrw,
+                        remainingKrw: math.max(0, budget - totalKrw),
+                      ),
+                      const SizedBox(height: 32),
+                      Row(
+                        children: [
+                          Text(
+                            '최근 지출 내역',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const Spacer(),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const LedgerScreen(),
+                                ),
+                              );
+                            },
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppTheme.primary,
+                              padding: EdgeInsets.zero,
+                            ),
+                            child: const Text('전체보기'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      if (recent.isEmpty)
+                        _EmptyRecentCard(onTap: () => _showAddSheet(context))
+                      else
+                        ...recent.map(
+                          (record) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _RecentExpenseTile(
+                              record: record,
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        LedgerDetailScreen(record: record),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 24),
+                      if (selectedTravel != null)
+                        _SelectedTravelSummaryCard(
+                          travelTitle: selectedTravel.title,
+                        )
+                      else if (latest != null)
+                        _TravelSummaryCard(record: latest)
+                      else
+                        const _TravelPlaceholderCard(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            HeaderMenuOverlay(
+              isOpen: _isMenuOpen,
+              dimTopOffset: 94,
+              onDismiss: () => setState(() => _isMenuOpen = false),
+              onTravelTap: () {
+                setState(() => _isMenuOpen = false);
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const TravelListScreen()),
+                );
+              },
+              onSettingsTap: () {
+                setState(() => _isMenuOpen = false);
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                );
+              },
+            ),
           ],
         ),
       ),
     );
   }
 
-  String _displayCurrency(List<ReceiptRecord> records) {
+  String _displayCurrency(List<ReceiptRecord> records, Travel? selectedTravel) {
     for (final record in records) {
       if (record.currency != 'KRW') {
         return record.currency;
       }
+    }
+    if (selectedTravel != null &&
+        selectedTravel.exchangeTargetCurrency.isNotEmpty) {
+      return selectedTravel.exchangeTargetCurrency;
     }
     return records.isEmpty ? 'KRW' : records.first.currency;
   }
@@ -170,12 +238,14 @@ class _HomeHeader extends StatelessWidget {
     required this.travelTitle,
     required this.period,
     required this.status,
+    required this.onMenuTap,
   });
 
   final String title;
   final String travelTitle;
   final String period;
   final String status;
+  final VoidCallback onMenuTap;
 
   @override
   Widget build(BuildContext context) {
@@ -192,7 +262,7 @@ class _HomeHeader extends StatelessWidget {
               ),
             ),
             const Spacer(),
-            const _HeaderMenuButton(),
+            HeaderMenuToggleButton(onTap: onMenuTap),
           ],
         ),
         const SizedBox(height: 10),
@@ -224,58 +294,6 @@ class _HomeHeader extends StatelessWidget {
           ],
         ),
       ],
-    );
-  }
-}
-
-class _HeaderMenuButton extends StatelessWidget {
-  const _HeaderMenuButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return PopupMenuButton<_HeaderMenuAction>(
-      tooltip: '메뉴',
-      offset: const Offset(-8, 46),
-      color: Colors.white,
-      elevation: 12,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
-      onSelected: (value) {
-        final route = switch (value) {
-          _HeaderMenuAction.travel => MaterialPageRoute(
-            builder: (_) => const TravelListScreen(),
-          ),
-          _HeaderMenuAction.settings => MaterialPageRoute(
-            builder: (_) => const SettingsScreen(),
-          ),
-        };
-        Navigator.of(context).push(route);
-      },
-      itemBuilder: (context) => [
-        PopupMenuItem(
-          value: _HeaderMenuAction.travel,
-          height: 48,
-          child: Text(
-            '나의 여행 목록',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(color: AppTheme.primary),
-          ),
-        ),
-        PopupMenuItem(
-          value: _HeaderMenuAction.settings,
-          height: 48,
-          child: Text(
-            '환경 설정',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(color: AppTheme.primary),
-          ),
-        ),
-      ],
-      child: const Padding(
-        padding: EdgeInsets.all(4),
-        child: Icon(Icons.menu_rounded, size: 32, color: AppTheme.primary),
-      ),
     );
   }
 }
@@ -649,6 +667,70 @@ class _TravelSummaryCard extends StatelessWidget {
   }
 }
 
+class _SelectedTravelSummaryCard extends StatelessWidget {
+  const _SelectedTravelSummaryCard({required this.travelTitle});
+
+  final String travelTitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F9FC),
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              color: const Color(0xFFDCE8FF),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Center(
+              child: Icon(
+                Icons.luggage_rounded,
+                color: AppTheme.primary,
+                size: 28,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '선택된 여행',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFF99A1B3),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  travelTitle,
+                  style: Theme.of(context).textTheme.titleLarge,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            '메인 적용 중',
+            style: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(color: AppTheme.primary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _TravelPlaceholderCard extends StatelessWidget {
   const _TravelPlaceholderCard();
 
@@ -764,8 +846,6 @@ class _AddExpenseSheet extends StatelessWidget {
     );
   }
 }
-
-enum _HeaderMenuAction { travel, settings }
 
 class _ActionCard extends StatelessWidget {
   const _ActionCard({
