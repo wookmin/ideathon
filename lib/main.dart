@@ -15,12 +15,14 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('ko');
   await CameraService.warmUp();
+
   await Hive.initFlutter();
   Hive
     ..registerAdapter(ReceiptItemAdapter())
     ..registerAdapter(ReceiptRecordAdapter())
     ..registerAdapter(ReceiptAnalysisItemAdapter())
     ..registerAdapter(ReceiptAnalysisAdapter());
+
   await Hive.openBox<ReceiptRecord>(ledgerBoxName);
 
   runApp(const ProviderScope(child: TripReceiptApp()));
@@ -53,9 +55,9 @@ class _AppBootstrapScreenState extends State<_AppBootstrapScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_requested) {
-      return;
-    }
+
+    if (_requested) return;
+
     _requested = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _preparePermissions();
@@ -65,6 +67,7 @@ class _AppBootstrapScreenState extends State<_AppBootstrapScreen> {
   Future<void> _preparePermissions() async {
     try {
       final cameraStatus = await Permission.camera.status;
+
       if (!cameraStatus.isGranted) {
         final next = await Permission.camera.request();
         if (next.isGranted) {
