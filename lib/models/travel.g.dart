@@ -2,7 +2,7 @@ part of 'travel.dart';
 
 class TravelAdapter extends TypeAdapter<Travel> {
   @override
-  final int typeId = 2;
+  final int typeId = 4;
 
   @override
   Travel read(BinaryReader reader) {

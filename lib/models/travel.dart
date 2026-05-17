@@ -2,7 +2,7 @@ import 'package:hive/hive.dart';
 
 part 'travel.g.dart';
 
-@HiveType(typeId: 2)
+@HiveType(typeId: 4)
 class Travel extends HiveObject {
   Travel({
     required this.id,
