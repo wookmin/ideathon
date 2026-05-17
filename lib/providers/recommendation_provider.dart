@@ -1,11 +1,9 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/recommend_category.dart';
 import '../models/recommend_place.dart';
@@ -13,14 +11,14 @@ import '../services/google_places_service.dart';
 import 'exchange_provider.dart';
 
 class RecommendationProvider extends ChangeNotifier {
-  RecommendationProvider(SharedPreferences? prefs, Dio dio)
-      : _placesService = prefs != null ? GooglePlacesService(prefs, dio) : null;
+  RecommendationProvider(this._placesService);
 
-  final GooglePlacesService? _placesService;
+  final GooglePlacesService _placesService;
 
   GoogleMapController? mapController;
 
   bool isLoading = true;
+  String? errorMessage;
 
   LatLng? currentPosition;
 
@@ -38,6 +36,7 @@ class RecommendationProvider extends ChangeNotifier {
   Future<void> initialize() async {
     try {
       isLoading = true;
+      errorMessage = null;
 
       notifyListeners();
 
@@ -45,6 +44,7 @@ class RecommendationProvider extends ChangeNotifier {
 
       await fetchRecommendations();
     } catch (e) {
+      errorMessage = _friendlyMessage(e);
       debugPrint(e.toString());
     } finally {
       isLoading = false;
@@ -95,9 +95,10 @@ class RecommendationProvider extends ChangeNotifier {
 
   /// 추천 불러오기
   Future<void> fetchRecommendations() async {
-    if (currentPosition == null || _placesService == null) return;
+    if (currentPosition == null) return;
 
     isLoading = true;
+    errorMessage = null;
 
     notifyListeners();
 
@@ -113,8 +114,13 @@ class RecommendationProvider extends ChangeNotifier {
 
       if (places.isNotEmpty) {
         selectedPlace = places.first;
+      } else {
+        selectedPlace = null;
       }
     } catch (e) {
+      errorMessage = _friendlyMessage(e);
+      places = [];
+      selectedPlace = null;
       debugPrint(e.toString());
     } finally {
       isLoading = false;
@@ -180,14 +186,27 @@ class RecommendationProvider extends ChangeNotifier {
       mapCompleter.complete(controller);
     }
   }
+
+  String _friendlyMessage(Object error) {
+    final message = error.toString();
+
+    if (message.contains('Location service disabled')) {
+      return '위치 서비스가 꺼져 있어 추천 장소를 불러올 수 없어요.';
+    }
+    if (message.contains('Location permanently denied')) {
+      return '위치 권한이 차단되어 있어요. 설정에서 권한을 다시 허용해 주세요.';
+    }
+    if (message.contains('denied')) {
+      return '위치 권한이 필요해요. 권한을 허용한 뒤 다시 시도해 주세요.';
+    }
+    return '추천 장소를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.';
+  }
 }
 
 /// Riverpod Provider
 final recommendationProvider =
     ChangeNotifierProvider<RecommendationProvider>(
-  (ref) {
-    final prefs = ref.watch(sharedPreferencesProvider).valueOrNull;
-    final dio = ref.watch(dioProvider);
-    return RecommendationProvider(prefs, dio);
-  },
+  (ref) => RecommendationProvider(
+    GooglePlacesService(ref.watch(dioProvider)),
+  ),
 );

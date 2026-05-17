@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'env_local.dart' as local;
 
 class Env {
@@ -17,9 +19,14 @@ class Env {
     defaultValue: local.mapKey,
   );
 
-  static const backendBaseUrl = String.fromEnvironment(
-    'BACKEND_BASE_URL',
-    defaultValue:
-        'https://tripreceipt-backend-593945546381.asia-northeast3.run.app/',
-  );
+  static String get backendBaseUrl {
+    const configured = String.fromEnvironment(
+      'BACKEND_BASE_URL',
+      defaultValue: '',
+    );
+    if (configured.isNotEmpty) {
+      return configured;
+    }
+    return kIsWeb ? '' : 'http://127.0.0.1:4000';
+  }
 }

@@ -8,9 +8,8 @@ import '../models/recommend_place.dart';
 import '../utils/map_utils.dart';
 
 class GooglePlacesService {
-  GooglePlacesService(this._prefs, this._dio);
+  GooglePlacesService(this._dio);
 
-  final SharedPreferences _prefs;
   final Dio _dio;
   static const _userIdKey = 'financial_api_user_id_v1';
 
@@ -21,7 +20,9 @@ class GooglePlacesService {
     required double longitude,
     required RecommendCategory category,
   }) async {
-    final userId = _getOrCreateUserId();
+    final prefs = await SharedPreferences.getInstance();
+    final userId = _getOrCreateUserId(prefs);
+
     final response = await _dio.get<Map<String, dynamic>>(
       '$_baseUrl/api/v1/places/nearby',
       queryParameters: {
@@ -56,11 +57,11 @@ class GooglePlacesService {
     }).toList();
   }
 
-  String _getOrCreateUserId() {
-    final existing = _prefs.getString(_userIdKey);
+  String _getOrCreateUserId(SharedPreferences prefs) {
+    final existing = prefs.getString(_userIdKey);
     if (existing != null && existing.isNotEmpty) return existing;
     final generated = const Uuid().v4();
-    _prefs.setString(_userIdKey, generated);
+    prefs.setString(_userIdKey, generated);
     return generated;
   }
 

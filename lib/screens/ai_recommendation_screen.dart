@@ -39,8 +39,12 @@ class _AIRecommendationScreenState
       backgroundColor: AppColors.background,
       bottomNavigationBar: const MainBottomNav(currentIndex: 2),
       body: provider.currentPosition == null
-          ? const Center(
-              child: CircularProgressIndicator(),
+          ? _RecommendationStatusView(
+              isLoading: provider.isLoading,
+              message: provider.errorMessage,
+              onRetry: () {
+                ref.read(recommendationProvider).initialize();
+              },
             )
           : Stack(
               children: [
@@ -140,6 +144,22 @@ class _AIRecommendationScreenState
                   const Positioned.fill(
                     child: ShimmerMapLoading(),
                   ),
+
+                if (provider.errorMessage != null &&
+                    !provider.isLoading)
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: provider.selectedPlace != null ? 320 : 30,
+                    child: _InlineErrorCard(
+                      message: provider.errorMessage!,
+                      onRetry: () {
+                        ref
+                            .read(recommendationProvider)
+                            .fetchRecommendations();
+                      },
+                    ),
+                  ),
               ],
             ),
     );
@@ -193,5 +213,114 @@ class _AIRecommendationScreenState
       default:
         return BitmapDescriptor.hueAzure;
     }
+  }
+}
+
+class _RecommendationStatusView extends StatelessWidget {
+  const _RecommendationStatusView({
+    required this.isLoading,
+    required this.message,
+    required this.onRetry,
+  });
+
+  final bool isLoading;
+  final String? message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.location_off_rounded,
+              size: 54,
+              color: AppColors.primary,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              message ?? '추천 장소를 불러오지 못했어요.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 18),
+            ElevatedButton(
+              onPressed: onRetry,
+              child: const Text('다시 시도'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineErrorCard extends StatelessWidget {
+  const _InlineErrorCard({
+    required this.message,
+    required this.onRetry,
+  });
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.info_outline_rounded,
+              color: AppColors.primary,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textPrimary,
+                  height: 1.4,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            TextButton(
+              onPressed: onRetry,
+              child: const Text('재시도'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
