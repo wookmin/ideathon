@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../config/env.dart';
+import '../models/card_account.dart';
 import '../models/card_connection.dart';
 import '../models/card_transaction.dart';
 
@@ -59,10 +60,33 @@ class FinancialApiService {
     );
   }
 
+  Future<List<CardAccount>> listCards({
+    required String connectionId,
+    required String birthDate,
+    required String inquiryType,
+  }) async {
+    final response = await _request(
+      () => _dio.get<Map<String, dynamic>>(
+        '$_baseUrl/api/v1/card/connections/$connectionId/cards',
+        queryParameters: {
+          'birthDate': birthDate,
+          'inquiryType': inquiryType,
+        },
+      ),
+    );
+    final raw = response.data?['cards'] as List<dynamic>? ?? const [];
+    return raw
+        .map((item) => CardAccount.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<List<CardTransaction>> syncConnection({
     required String connectionId,
     required String startDate,
     required String endDate,
+    required String birthDate,
+    required String inquiryType,
+    required String orderBy,
     String? cardNo,
   }) async {
     final response = await _request(
@@ -71,6 +95,9 @@ class FinancialApiService {
         data: {
           'startDate': startDate,
           'endDate': endDate,
+          'birthDate': birthDate,
+          'inquiryType': inquiryType,
+          'orderBy': orderBy,
           if (cardNo != null && cardNo.trim().isNotEmpty) 'cardNo': cardNo.trim(),
         },
       ),

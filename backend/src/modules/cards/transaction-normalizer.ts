@@ -15,9 +15,40 @@ function parseNumber(input: string | number | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function pickFirstString(
+  item: CodefApprovalItem,
+  keys: Array<keyof CodefApprovalItem>,
+): string {
+  for (const key of keys) {
+    const value = item[key];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return '';
+}
+
+function pickFirstNumber(
+  item: CodefApprovalItem,
+  keys: Array<keyof CodefApprovalItem>,
+): number {
+  for (const key of keys) {
+    const value = item[key];
+    const parsed =
+      typeof value === 'number'
+        ? value
+        : (typeof value === 'string' ? parseNumber(value) : 0);
+    if (parsed !== 0) {
+      return parsed;
+    }
+  }
+  return 0;
+}
+
 function normalizeDateTime(item: CodefApprovalItem): string {
-  const date = item.approvalDate ?? item.approvalDay ?? '';
-  const time = (item.approvalTime ?? '000000').padEnd(6, '0').slice(0, 6);
+  const date = pickFirstString(item, ['approvalDate', 'approvalDay', 'resUsedDate']);
+  const rawTime = pickFirstString(item, ['approvalTime', 'resUsedTime']);
+  const time = (rawTime || '000000').padEnd(6, '0').slice(0, 6);
   if (!/^\d{8}$/.test(date)) {
     return new Date().toISOString();
   }
@@ -53,9 +84,14 @@ export function normalizeApprovalItems(params: {
 }) {
   return params.items.map<CardTransaction>((item) => {
     const approvedAt = normalizeDateTime(item);
-    const approvalAmount = parseNumber(item.approvalAmount);
-    const cardNoMasked = item.resCardNo ?? item.cardNo ?? '';
-    const merchantName = item.merchantName?.trim() || '알 수 없는 가맹점';
+    const approvalAmount = pickFirstNumber(item, [
+      'approvalAmount',
+      'resUsedAmount',
+      'billingAmount',
+    ]);
+    const cardNoMasked = pickFirstString(item, ['resCardNo', 'cardNo']);
+    const merchantName =
+      pickFirstString(item, ['merchantName', 'resMemberStoreName']) || '알 수 없는 가맹점';
     const dedupeKey = buildDedupeKey(
       params.connection.id,
       approvedAt,
@@ -73,18 +109,23 @@ export function normalizeApprovalItems(params: {
       organizationName: params.connection.organizationName,
       approvedAt,
       merchantName,
-      amountKrw: parseNumber(item.billingAmount) || approvalAmount,
+      amountKrw:
+        pickFirstNumber(item, ['billingAmount', 'approvalAmount', 'resUsedAmount']) ||
+        approvalAmount,
       approvalAmount,
-      approvalStatus: item.approvalStatus ?? 'UNKNOWN',
-      cardName: item.cardName ?? '',
+      approvalStatus:
+        pickFirstString(item, ['approvalStatus', 'resApprovalStatus', 'resCancelYN']) ||
+        'UNKNOWN',
+      cardName: pickFirstString(item, ['cardName', 'resCardName']),
       cardNoMasked,
-      approvalNo: item.approvalNo,
-      originAmount: parseNumber(item.originAmount) || undefined,
+      approvalNo: pickFirstString(item, ['approvalNo', 'resApprovalNo']) || undefined,
+      originAmount: pickFirstNumber(item, ['originAmount']) || undefined,
       originCurrency: item.originCurrency || undefined,
-      billingAmountKrw: parseNumber(item.billingAmount) || undefined,
+      billingAmountKrw: pickFirstNumber(item, ['billingAmount', 'resUsedAmount']) || undefined,
       billingCurrency: item.billingCurrency || undefined,
-      paymentType: item.paymentType || undefined,
-      installmentMonths: parseNumber(item.installmentMonths) || undefined,
+      paymentType: pickFirstString(item, ['paymentType', 'resPaymentType']) || undefined,
+      installmentMonths:
+        pickFirstNumber(item, ['installmentMonths', 'resInstallmentMonth']) || undefined,
       dedupeKey,
       rawPayload: item as Record<string, unknown>,
       createdAt: now,

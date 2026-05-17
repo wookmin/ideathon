@@ -49,13 +49,23 @@ export interface CodefApprovalItem {
   merchantAddr?: string;
   cardName?: string;
   cardNo?: string;
-  resCardNo?: string;
   paymentType?: string;
   installmentMonths?: string | number;
   originAmount?: string | number;
   originCurrency?: string;
   billingAmount?: string | number;
   billingCurrency?: string;
+  resCardName?: string;
+  resCardNo?: string;
+  resUsedAmount?: string | number;
+  resMemberStoreName?: string;
+  resApprovalNo?: string;
+  resApprovalStatus?: string;
+  resUsedDate?: string;
+  resUsedTime?: string;
+  resInstallmentMonth?: string | number;
+  resPaymentType?: string;
+  resCancelYN?: string;
 }
 
 export interface CodefApprovalListData {

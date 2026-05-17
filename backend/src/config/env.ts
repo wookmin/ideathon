@@ -10,6 +10,7 @@ const envSchema = z.object({
   CODEF_ENV: z.enum(['sandbox', 'development', 'production']).default('sandbox'),
   CODEF_CLIENT_ID: z.string().min(1, 'CODEF_CLIENT_ID is required'),
   CODEF_CLIENT_SECRET: z.string().min(1, 'CODEF_CLIENT_SECRET is required'),
+  CODEF_PUBLIC_KEY: z.string().optional().default(''),
   APP_ENCRYPTION_SECRET: z.string().min(16, 'APP_ENCRYPTION_SECRET must be at least 16 chars'),
 });
 

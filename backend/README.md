@@ -6,6 +6,7 @@ Flutter 앱이 CODEF를 직접 호출하지 않도록 중간 백엔드를 두는
 
 - CODEF OAuth 토큰 발급 및 캐시
 - 카드사 계정 연결 요청 프록시
+- CODEF `public_key` 기반 비밀번호 RSA 암호화
 - 승인내역 조회 및 앱 친화적 거래 포맷으로 정규화
 - 연결/거래 조회용 REST API 제공
 - 개발 단계에서는 인메모리 저장소 사용
@@ -16,6 +17,7 @@ Flutter 앱이 CODEF를 직접 호출하지 않도록 중간 백엔드를 두는
 - `GET /api/v1/card/connections`
 - `POST /api/v1/card/connections`
 - `DELETE /api/v1/card/connections/:connectionId`
+- `GET /api/v1/card/connections/:connectionId/cards`
 - `POST /api/v1/card/connections/:connectionId/sync`
 - `GET /api/v1/transactions`
 
@@ -29,6 +31,12 @@ npm run dev
 ```
 
 기본 포트는 `4000` 입니다.
+
+`backend/.env`에는 CODEF 데모 화면에서 받은 아래 값을 넣어야 합니다.
+
+- `CODEF_CLIENT_ID`
+- `CODEF_CLIENT_SECRET`
+- `CODEF_PUBLIC_KEY`
 
 ## Temporary auth model
 
@@ -79,6 +87,7 @@ curl -X POST http://localhost:4000/api/v1/card/connections/<connection-id>/sync 
 ## Security notes
 
 - `CODEF_CLIENT_SECRET`는 절대 Flutter 앱에 넣지 않습니다.
+- `CODEF_PUBLIC_KEY`는 계정 연결 시 카드사 비밀번호를 RSA 암호화하는 데 사용합니다.
 - `connectedId`는 서버에서만 저장하고, 여기서는 간단히 대칭 암호화 후 메모리에 보관합니다.
 - 카드사 ID/PW는 저장하지 않고 연결 생성 요청 시에만 사용합니다.
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../config/theme.dart';
+import '../models/card_account.dart';
 import '../models/card_connection.dart';
 import '../models/card_transaction.dart';
 import '../providers/financial_provider.dart';
@@ -21,11 +22,14 @@ class _CardSyncScreenState extends ConsumerState<CardSyncScreen> {
   final _organizationNameController = TextEditingController();
   final _loginIdController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _cardNoController = TextEditingController();
+  final _birthDateController = TextEditingController();
 
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 30));
   DateTime _endDate = DateTime.now();
   String _loginType = '1';
+  String _inquiryType = '0';
+  String _orderBy = '0';
+  final Map<String, String> _selectedCardNos = {};
 
   @override
   void dispose() {
@@ -33,7 +37,7 @@ class _CardSyncScreenState extends ConsumerState<CardSyncScreen> {
     _organizationNameController.dispose();
     _loginIdController.dispose();
     _passwordController.dispose();
-    _cardNoController.dispose();
+    _birthDateController.dispose();
     super.dispose();
   }
 
@@ -68,18 +72,76 @@ class _CardSyncScreenState extends ConsumerState<CardSyncScreen> {
   }
 
   Future<void> _sync(CardConnection connection) async {
+    final birthDate = _birthDateController.text.trim();
+    if (!RegExp(r'^\d{8}$').hasMatch(birthDate)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('생년월일을 YYYYMMDD 형식으로 입력해 주세요.')),
+      );
+      return;
+    }
+    final selectedCardNo = _selectedCardNos[connection.id];
+    if (selectedCardNo == null || selectedCardNo.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('먼저 보유 카드를 조회하고 조회할 카드를 선택해 주세요.')),
+      );
+      return;
+    }
+
     try {
       await ref.read(cardSyncProvider.notifier).syncConnection(
             connectionId: connection.id,
             startDate: _compactDate(_startDate),
             endDate: _compactDate(_endDate),
-            cardNo: _cardNoController.text.trim(),
+            birthDate: birthDate,
+            inquiryType: _inquiryType,
+            orderBy: _orderBy,
+            cardNo: selectedCardNo,
           );
       if (!mounted) {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('승인내역 동기화를 완료했습니다.')),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  Future<void> _loadCards(CardConnection connection) async {
+    final birthDate = _birthDateController.text.trim();
+    if (!RegExp(r'^\d{8}$').hasMatch(birthDate)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('생년월일을 YYYYMMDD 형식으로 입력한 뒤 카드 조회를 해 주세요.')),
+      );
+      return;
+    }
+
+    try {
+      final cards = await ref.read(cardSyncProvider.notifier).loadCards(
+            connectionId: connection.id,
+            birthDate: birthDate,
+            inquiryType: _inquiryType,
+          );
+      if (!mounted) {
+        return;
+      }
+      if (cards.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('조회 가능한 카드 목록이 없습니다.')),
+        );
+        return;
+      }
+      setState(() {
+        _selectedCardNos.putIfAbsent(connection.id, () => cards.first.cardNo);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${cards.length}개의 카드를 불러왔습니다.')),
       );
     } catch (error) {
       if (!mounted) {
@@ -176,9 +238,13 @@ class _CardSyncScreenState extends ConsumerState<CardSyncScreen> {
               _SyncRangeCard(
                 startDate: _startDate,
                 endDate: _endDate,
-                cardNoController: _cardNoController,
+                birthDateController: _birthDateController,
+                inquiryType: _inquiryType,
+                orderBy: _orderBy,
                 onPickStartDate: () => _pickDate(isStart: true),
                 onPickEndDate: () => _pickDate(isStart: false),
+                onInquiryTypeChanged: (value) => setState(() => _inquiryType = value),
+                onOrderByChanged: (value) => setState(() => _orderBy = value),
               ),
               const SizedBox(height: 24),
               Text('연결된 카드사', style: Theme.of(context).textTheme.titleLarge),
@@ -194,8 +260,16 @@ class _CardSyncScreenState extends ConsumerState<CardSyncScreen> {
                     padding: const EdgeInsets.only(bottom: 12),
                     child: _ConnectionTile(
                       connection: connection,
+                      cards: state.cardsByConnection[connection.id] ?? const [],
+                      selectedCardNo: _selectedCardNos[connection.id],
                       isBusy: state.activeConnectionId == connection.id &&
                           (state.isSubmitting || state.isSyncing),
+                      onLoadCards: () => _loadCards(connection),
+                      onCardSelected: (value) {
+                        setState(() {
+                          _selectedCardNos[connection.id] = value;
+                        });
+                      },
                       onSync: () => _sync(connection),
                       onDelete: () => _delete(connection),
                     ),
@@ -439,16 +513,24 @@ class _SyncRangeCard extends StatelessWidget {
   const _SyncRangeCard({
     required this.startDate,
     required this.endDate,
-    required this.cardNoController,
+    required this.birthDateController,
+    required this.inquiryType,
+    required this.orderBy,
     required this.onPickStartDate,
     required this.onPickEndDate,
+    required this.onInquiryTypeChanged,
+    required this.onOrderByChanged,
   });
 
   final DateTime startDate;
   final DateTime endDate;
-  final TextEditingController cardNoController;
+  final TextEditingController birthDateController;
+  final String inquiryType;
+  final String orderBy;
   final VoidCallback onPickStartDate;
   final VoidCallback onPickEndDate;
+  final ValueChanged<String> onInquiryTypeChanged;
+  final ValueChanged<String> onOrderByChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -485,11 +567,45 @@ class _SyncRangeCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           TextField(
-            controller: cardNoController,
+            controller: birthDateController,
+            keyboardType: TextInputType.number,
             decoration: const InputDecoration(
-              labelText: '특정 카드번호 필터',
-              hintText: '마스킹 포함 카드번호 일부, 비워두면 전체',
+              labelText: '생년월일',
+              hintText: '예: 19950130 (YYYYMMDD)',
             ),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            initialValue: inquiryType,
+            decoration: const InputDecoration(labelText: '조회 유형'),
+            items: const [
+              DropdownMenuItem(value: '0', child: Text('기본 조회')),
+              DropdownMenuItem(value: '1', child: Text('확장 조회')),
+            ],
+            onChanged: (value) {
+              if (value != null) {
+                onInquiryTypeChanged(value);
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            initialValue: orderBy,
+            decoration: const InputDecoration(labelText: '정렬 기준'),
+            items: const [
+              DropdownMenuItem(value: '0', child: Text('최신순')),
+              DropdownMenuItem(value: '1', child: Text('과거순')),
+            ],
+            onChanged: (value) {
+              if (value != null) {
+                onOrderByChanged(value);
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '카드번호는 아래 연결된 카드사 카드 목록에서 선택합니다.',
+            style: Theme.of(context).textTheme.labelMedium,
           ),
         ],
       ),
@@ -500,13 +616,21 @@ class _SyncRangeCard extends StatelessWidget {
 class _ConnectionTile extends StatelessWidget {
   const _ConnectionTile({
     required this.connection,
+    required this.cards,
+    required this.selectedCardNo,
     required this.isBusy,
+    required this.onLoadCards,
+    required this.onCardSelected,
     required this.onSync,
     required this.onDelete,
   });
 
   final CardConnection connection;
+  final List<CardAccount> cards;
+  final String? selectedCardNo;
   final bool isBusy;
+  final VoidCallback onLoadCards;
+  final ValueChanged<String> onCardSelected;
   final VoidCallback onSync;
   final VoidCallback onDelete;
 
@@ -545,6 +669,33 @@ class _ConnectionTile extends StatelessWidget {
                 : '마지막 동기화 ${RecordPresenter.relativeDate(connection.lastSyncedAt!)}',
             style: Theme.of(context).textTheme.labelMedium,
           ),
+          const SizedBox(height: 14),
+          OutlinedButton(
+            onPressed: isBusy ? null : onLoadCards,
+            child: Text(cards.isEmpty ? '보유 카드 조회' : '보유 카드 다시 조회'),
+          ),
+          if (cards.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: selectedCardNo ?? cards.first.cardNo,
+              decoration: const InputDecoration(labelText: '조회할 카드 선택'),
+              items: cards
+                  .map(
+                    (card) => DropdownMenuItem(
+                      value: card.cardNo,
+                      child: Text('${card.cardName} · ${card.cardNo}'),
+                    ),
+                  )
+                  .toList(),
+              onChanged: isBusy
+                  ? null
+                  : (value) {
+                      if (value != null) {
+                        onCardSelected(value);
+                      }
+                    },
+            ),
+          ],
           const SizedBox(height: 14),
           Row(
             children: [

@@ -7,8 +7,10 @@ import type { CardTransactionRepository } from '../../repositories/card-transact
 import { CodefClient } from '../codef/codef-client.js';
 import { normalizeApprovalItems } from './transaction-normalizer.js';
 import type {
+  CardAccount,
   CardConnection,
   CreateConnectionInput,
+  ListCardsInput,
   ListTransactionsInput,
   SyncTransactionsInput,
 } from './cards-types.js';
@@ -61,6 +63,43 @@ export class CardsService {
     await this.cardConnectionRepository.delete(userId, connectionId);
   }
 
+  async listCards(
+    userId: string,
+    connectionId: string,
+    input: ListCardsInput,
+  ): Promise<CardAccount[]> {
+    const connection = await this.cardConnectionRepository.findById(userId, connectionId);
+    if (!connection) {
+      throw new AppError(404, 'CONNECTION_NOT_FOUND', 'Card connection not found');
+    }
+
+    const connectedId = decrypt(connection.encryptedConnectedId);
+    const response = await this.codefClient.fetchCardList({
+      connectedId,
+      organization: connection.organization,
+      birthDate: input.birthDate,
+      inquiryType: input.inquiryType,
+    });
+    console.error('[codef-card-list-response]', {
+      connectionId,
+      organization: connection.organization,
+      birthDate: input.birthDate,
+      inquiryType: input.inquiryType,
+      response,
+    });
+    const rawData = response.data;
+    const items = Array.isArray(rawData)
+      ? rawData
+      : (rawData?.cardList ?? []);
+
+    return items.map((item) => ({
+      cardNo: item.resCardNo ?? '',
+      cardName: item.cardName ?? '이름 없는 카드',
+      organization: item.organization ?? connection.organization,
+      organizationName: item.organizationName ?? connection.organizationName,
+    }));
+  }
+
   async syncTransactions(
     userId: string,
     connectionId: string,
@@ -72,18 +111,44 @@ export class CardsService {
     }
 
     const connectedId = decrypt(connection.encryptedConnectedId);
-    const response = await this.codefClient.fetchApprovalList({
-      connectedId,
+    console.error('[codef-approval-list-request]', {
+      connectionId,
       organization: connection.organization,
+      connectedId,
+      birthDate: input.birthDate,
+      inquiryType: input.inquiryType,
+      orderBy: input.orderBy,
       startDate: input.startDate,
       endDate: input.endDate,
       cardNo: input.cardNo,
     });
-    const items =
-      response.data?.approvalList ??
-      response.data?.resApprovalList ??
-      [];
+    const response = await this.codefClient.fetchApprovalList({
+      connectedId,
+      organization: connection.organization,
+      birthDate: input.birthDate,
+      inquiryType: input.inquiryType,
+      orderBy: input.orderBy,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      cardNo: input.cardNo,
+    });
+    console.error('[codef-approval-list-response]', {
+      connectionId,
+      organization: connection.organization,
+      response,
+    });
+    const rawData = response.data;
+    const items = Array.isArray(rawData)
+      ? rawData
+      : (rawData?.approvalList ??
+          rawData?.resApprovalList ??
+          []);
     const normalized = normalizeApprovalItems({ connection, items });
+    console.error('[codef-approval-list-sample]', {
+      rawItem: items[0] ?? null,
+      normalizedItem: normalized[0] ?? null,
+      itemCount: items.length,
+    });
     const result = await this.cardTransactionRepository.upsertMany(normalized);
 
     const updatedConnection: CardConnection = {

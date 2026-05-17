@@ -2,6 +2,7 @@ import { Buffer } from 'node:buffer';
 
 import { appEnv } from '../../config/env.js';
 import { AppError } from '../../utils/app-error.js';
+import { encryptForCodef } from '../../utils/codef-rsa.js';
 import type {
   CodefAccountCreateData,
   CodefApprovalListData,
@@ -29,6 +30,9 @@ interface FetchApprovalListInput {
   organization: string;
   startDate: string;
   endDate: string;
+  birthDate: string;
+  inquiryType: string;
+  orderBy: string;
   cardNo?: string;
 }
 
@@ -36,16 +40,17 @@ export class CodefClient {
   private accessTokenCache?: AccessTokenCache;
 
   async createConnection(input: CreateConnectionInput) {
+    const encryptedPassword = encryptForCodef(input.credentials.password);
     const body = {
       accountList: [
         {
           countryCode: 'KR',
-          businessType: 'CARD',
+          businessType: 'CD',
           clientType: 'P',
           organization: input.organization,
           loginType: input.loginType,
           id: input.credentials.id,
-          password: input.credentials.password,
+          password: encryptedPassword,
         },
       ],
     };
@@ -53,10 +58,17 @@ export class CodefClient {
     return this.post<CodefAccountCreateData>('/v1/account/create', body);
   }
 
-  async fetchCardList(connectedId: string, organization: string) {
+  async fetchCardList(params: {
+    connectedId: string;
+    organization: string;
+    birthDate: string;
+    inquiryType: string;
+  }) {
     return this.post<CodefCardListData>('/v1/kr/card/p/account/card-list', {
-      connectedId,
-      organization,
+      connectedId: params.connectedId,
+      organization: params.organization,
+      birthDate: params.birthDate,
+      inquiryType: params.inquiryType,
     });
   }
 
@@ -64,6 +76,9 @@ export class CodefClient {
     return this.post<CodefApprovalListData>('/v1/kr/card/p/account/approval-list', {
       connectedId: input.connectedId,
       organization: input.organization,
+      birthDate: input.birthDate,
+      inquiryType: input.inquiryType,
+      orderBy: input.orderBy,
       startDate: input.startDate,
       endDate: input.endDate,
       ...(input.cardNo ? { cardNo: input.cardNo } : {}),
@@ -99,14 +114,20 @@ export class CodefClient {
   }
 
   private async handleResponse<T>(response: Response): Promise<CodefResponse<T>> {
-    const json = (await response.json()) as CodefResponse<T>;
+    const json = (await this.parseCodefResponse<T>(response)) as CodefResponse<T>;
     const code = json.result?.code;
+    const message = json.result?.message ?? 'CODEF request failed';
+    const extraMessage = json.result?.extraMessage;
+    const combinedMessage =
+      extraMessage && extraMessage.trim().length > 0
+        ? `${message} - ${extraMessage}`
+        : message;
 
     if (!response.ok) {
       throw new AppError(
         response.status,
         'CODEF_HTTP_ERROR',
-        json.result?.message ?? 'CODEF request failed',
+        combinedMessage,
         json,
       );
     }
@@ -119,10 +140,60 @@ export class CodefClient {
             ? 'CODEF_REQUEST_FAILED'
             : code;
 
-      throw new AppError(400, mappedCode, json.result?.message ?? 'CODEF request failed', json);
+      throw new AppError(400, mappedCode, combinedMessage, json);
     }
 
     return json;
+  }
+
+  private async parseCodefResponse<T>(response: Response): Promise<CodefResponse<T>> {
+    const rawText = await response.text();
+    const normalizedText = this.normalizeCodefBody(rawText);
+
+    try {
+      return JSON.parse(normalizedText) as CodefResponse<T>;
+    } catch (error) {
+      throw new AppError(
+        502,
+        'CODEF_RESPONSE_PARSE_FAILED',
+        'Failed to parse CODEF response body',
+        {
+          rawText,
+          normalizedText,
+          parseError: error instanceof Error ? error.message : String(error),
+        },
+      );
+    }
+  }
+
+  private normalizeCodefBody(rawText: string): string {
+    const trimmed = rawText.trim();
+    if (!trimmed) {
+      return '{}';
+    }
+
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      return trimmed;
+    }
+
+    // Some CODEF environments return percent-encoded JSON.
+    if (trimmed.startsWith('%7B') || trimmed.startsWith('%5B')) {
+      return decodeURIComponent(trimmed);
+    }
+
+    // Some responses are wrapped as urlencoded payloads like data=%7B...%7D
+    if (trimmed.includes('=')) {
+      const params = new URLSearchParams(trimmed);
+      const candidate =
+        params.get('data') ??
+        params.get('result') ??
+        [...params.values()][0];
+      if (candidate) {
+        return decodeURIComponent(candidate);
+      }
+    }
+
+    return trimmed;
   }
 
   private async getAccessToken(): Promise<string> {
@@ -147,7 +218,12 @@ export class CodefClient {
 
     if (!response.ok) {
       const text = await response.text();
-      throw new AppError(502, 'CODEF_OAUTH_FAILED', 'Failed to get CODEF access token', text);
+      throw new AppError(
+        502,
+        'CODEF_OAUTH_FAILED',
+        'Failed to get CODEF access token. Check CODEF_CLIENT_ID, CODEF_CLIENT_SECRET, and CODEF_ENV in backend/.env.',
+        text,
+      );
     }
 
     const json = (await response.json()) as {
@@ -156,7 +232,12 @@ export class CodefClient {
     };
 
     if (!json.access_token) {
-      throw new AppError(502, 'CODEF_OAUTH_FAILED', 'CODEF access token missing from response');
+      throw new AppError(
+        502,
+        'CODEF_OAUTH_FAILED',
+        'CODEF access token missing from response',
+        json,
+      );
     }
 
     const expiresInMs = (json.expires_in ?? 60 * 60 * 24 * 7) * 1000;

@@ -4,6 +4,7 @@ import { requireUser } from '../middleware/require-user.js';
 import type { CardsService } from '../modules/cards/cards-service.js';
 import {
   createConnectionSchema,
+  listCardsSchema,
   listTransactionsSchema,
   syncTransactionsSchema,
 } from '../modules/cards/cards-types.js';
@@ -39,6 +40,19 @@ export function createCardsRouter(cardsService: CardsService) {
     asyncHandler(async (req, res) => {
       await cardsService.deleteConnection(req.userId!, getSingleParam(req.params.connectionId));
       res.status(204).send();
+    }),
+  );
+
+  router.get(
+    '/card/connections/:connectionId/cards',
+    asyncHandler(async (req, res) => {
+      const query = listCardsSchema.parse(req.query);
+      const cards = await cardsService.listCards(
+        req.userId!,
+        getSingleParam(req.params.connectionId),
+        query,
+      );
+      res.json({ cards });
     }),
   );
 

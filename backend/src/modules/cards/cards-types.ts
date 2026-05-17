@@ -13,6 +13,9 @@ export const createConnectionSchema = z.object({
 export const syncTransactionsSchema = z.object({
   startDate: z.string().regex(/^\d{8}$/, 'Use YYYYMMDD format'),
   endDate: z.string().regex(/^\d{8}$/, 'Use YYYYMMDD format'),
+  birthDate: z.string().regex(/^\d{8}$/, 'Use YYYYMMDD format for birthDate'),
+  inquiryType: z.string().default('0'),
+  orderBy: z.string().default('0'),
   cardNo: z.string().min(1).optional(),
 });
 
@@ -22,9 +25,22 @@ export const listTransactionsSchema = z.object({
   organization: z.string().optional(),
 });
 
+export const listCardsSchema = z.object({
+  birthDate: z.string().regex(/^\d{8}$/, 'Use YYYYMMDD format for birthDate'),
+  inquiryType: z.string().default('0'),
+});
+
 export type CreateConnectionInput = z.infer<typeof createConnectionSchema>;
 export type SyncTransactionsInput = z.infer<typeof syncTransactionsSchema>;
 export type ListTransactionsInput = z.infer<typeof listTransactionsSchema>;
+export type ListCardsInput = z.infer<typeof listCardsSchema>;
+
+export interface CardAccount {
+  cardNo: string;
+  cardName: string;
+  organization: string;
+  organizationName: string;
+}
 
 export interface CardConnection {
   id: string;
