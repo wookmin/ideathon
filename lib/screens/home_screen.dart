@@ -1,14 +1,20 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../config/theme.dart';
+import '../models/receipt_record.dart';
 import '../providers/ledger_provider.dart';
 import '../utils/record_presenter.dart';
 import '../widgets/main_bottom_nav.dart';
 import 'ledger_detail_screen.dart';
 import 'ledger_screen.dart';
+import 'manual_entry_screen.dart';
 import 'scan_screen.dart';
+import 'settings_screen.dart';
+import 'travel_list_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -16,67 +22,46 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final records = ref.watch(ledgerProvider);
-    final recent = records.take(3).toList();
-    final total = RecordPresenter.totalSpend(records);
-    final monthSpend = RecordPresenter.monthlySpend(records);
-    final average = RecordPresenter.dailyAverage(records);
+    final recent = records.take(2).toList();
+    final totalKrw = RecordPresenter.totalSpend(records);
     final budget = RecordPresenter.budgetGoal(records);
-    final progress = total == 0 ? 0.0 : (total / budget).clamp(0, 1).toDouble();
+    final progress = budget <= 0 ? 0.0 : (totalKrw / budget).clamp(0.0, 0.999);
+    final latest = records.isEmpty ? null : records.first;
+    final displayCurrency = _displayCurrency(records);
+    final originalAmount = _displayOriginalAmount(records, displayCurrency);
+    final originalSymbol = RecordPresenter.symbol(displayCurrency);
 
     return Scaffold(
-      bottomNavigationBar: const MainBottomNav(currentIndex: 0),
+      backgroundColor: Colors.white,
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: AppTheme.primary,
+        foregroundColor: Colors.white,
+        elevation: 8,
+        onPressed: () => _showAddSheet(context),
+        child: const Icon(Icons.add_rounded, size: 34),
+      ),
+      bottomNavigationBar: const MainBottomNav(currentIndex: 1),
       body: SafeArea(
         child: ListView(
-          padding: AppTheme.screenPadding.copyWith(top: 18, bottom: 20),
+          padding: const EdgeInsets.fromLTRB(24, 14, 24, 28),
           children: [
-            const _Header(),
-            const SizedBox(height: 18),
-            _HeroCard(
-              title: RecordPresenter.travelTitle(records),
-              subtitle: RecordPresenter.travelDateRange(records),
+            _HomeHeader(
+              title: 'OneShot',
+              travelTitle: RecordPresenter.travelTitle(records),
+              period: RecordPresenter.travelDateRange(records),
               status: RecordPresenter.statusLabel(records),
-              total: total,
-              monthSpend: monthSpend,
-              progress: progress,
             ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: _MetricCard(
-                    label: '이번 달 지출',
-                    value: '₩${NumberFormat('#,##0').format(monthSpend)}',
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _MetricCard(
-                    label: '일평균 지출',
-                    value: '₩${NumberFormat('#,##0').format(average)}',
-                    emphasized: true,
-                  ),
-                ),
-              ],
+            const SizedBox(height: 22),
+            _BudgetGauge(progress: progress),
+            const SizedBox(height: 22),
+            _BudgetCard(
+              originalAmount: originalAmount,
+              originalSymbol: originalSymbol,
+              currency: displayCurrency,
+              usedKrw: totalKrw,
+              remainingKrw: math.max(0, budget - totalKrw),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _MetricCard(
-                    label: '최다 카테고리',
-                    value: RecordPresenter.topCategory(records),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _MetricCard(
-                    label: '저장 건수',
-                    value: '${records.length}건',
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
             Row(
               children: [
                 Text('최근 지출 내역', style: Theme.of(context).textTheme.titleLarge),
@@ -87,24 +72,22 @@ class HomeScreen extends ConsumerWidget {
                       MaterialPageRoute(builder: (_) => const LedgerScreen()),
                     );
                   },
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppTheme.primary,
+                    padding: EdgeInsets.zero,
+                  ),
                   child: const Text('전체보기'),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             if (recent.isEmpty)
-              _EmptyState(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const ScanScreen()),
-                  );
-                },
-              )
+              _EmptyRecentCard(onTap: () => _showAddSheet(context))
             else
               ...recent.map(
                 (record) => Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: _RecentExpenseCard(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _RecentExpenseTile(
                     record: record,
                     onTap: () {
                       Navigator.of(context).push(
@@ -116,283 +99,662 @@ class HomeScreen extends ConsumerWidget {
                   ),
                 ),
               ),
-            const SizedBox(height: 18),
-            _ScanCta(
-              recordCount: records.length,
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ScanScreen()),
-                );
-              },
-            ),
+            const SizedBox(height: 24),
+            if (latest != null)
+              _TravelSummaryCard(record: latest)
+            else
+              const _TravelPlaceholderCard(),
           ],
         ),
       ),
     );
   }
+
+  String _displayCurrency(List<ReceiptRecord> records) {
+    for (final record in records) {
+      if (record.currency != 'KRW') {
+        return record.currency;
+      }
+    }
+    return records.isEmpty ? 'EUR' : records.first.currency;
+  }
+
+  double _displayOriginalAmount(List<ReceiptRecord> records, String currency) {
+    final matching = records
+        .where((record) => record.currency == currency)
+        .toList();
+    if (matching.isEmpty) {
+      return 0;
+    }
+    return matching.fold<double>(
+      0,
+      (sum, record) => sum + record.originalAmount + _tipInOriginal(record),
+    );
+  }
+
+  double _tipInOriginal(ReceiptRecord record) {
+    if (record.tipPct <= 0) {
+      return 0;
+    }
+    return record.originalAmount * (record.tipPct / 100);
+  }
+
+  void _showAddSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (bottomSheetContext) {
+        return _AddExpenseSheet(
+          onScanTap: () {
+            Navigator.of(bottomSheetContext).pop();
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const ScanScreen()));
+          },
+          onManualTap: () {
+            Navigator.of(bottomSheetContext).pop();
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ManualEntryScreen()),
+            );
+          },
+        );
+      },
+    );
+  }
 }
 
-class _Header extends StatelessWidget {
-  const _Header();
+class _HomeHeader extends StatelessWidget {
+  const _HomeHeader({
+    required this.title,
+    required this.travelTitle,
+    required this.period,
+    required this.status,
+  });
+
+  final String title;
+  final String travelTitle;
+  final String period;
+  final String status;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const CircleAvatar(
-          radius: 24,
-          backgroundColor: Color(0xFFDCEBFF),
-          child: Icon(Icons.flight_takeoff_rounded, color: AppTheme.primary),
+        Row(
+          children: [
+            Text(
+              title,
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                fontSize: 31,
+                color: AppTheme.primary,
+              ),
+            ),
+            const Spacer(),
+            const _HeaderMenuButton(),
+          ],
         ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('여행 지출 대시보드', style: Theme.of(context).textTheme.labelMedium),
-              Text('TripReceipt', style: Theme.of(context).textTheme.titleLarge),
-            ],
-          ),
-        ),
-        IconButton(
-          onPressed: () {},
-          style: IconButton.styleFrom(
-            backgroundColor: AppTheme.surface,
-            foregroundColor: AppTheme.primary,
-          ),
-          icon: const Icon(Icons.tune_rounded),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Flexible(
+              child: Text(
+                travelTitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(color: AppTheme.primary),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                period,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: const Color(0xFF7C879B),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            _StatusChip(status: status),
+          ],
         ),
       ],
     );
   }
 }
 
-class _HeroCard extends StatelessWidget {
-  const _HeroCard({
-    required this.title,
-    required this.subtitle,
-    required this.status,
-    required this.total,
-    required this.monthSpend,
-    required this.progress,
-  });
+class _HeaderMenuButton extends StatelessWidget {
+  const _HeaderMenuButton();
 
-  final String title;
-  final String subtitle;
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<_HeaderMenuAction>(
+      tooltip: '메뉴',
+      offset: const Offset(-8, 46),
+      color: Colors.white,
+      elevation: 12,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+      onSelected: (value) {
+        final route = switch (value) {
+          _HeaderMenuAction.travel => MaterialPageRoute(
+            builder: (_) => const TravelListScreen(),
+          ),
+          _HeaderMenuAction.settings => MaterialPageRoute(
+            builder: (_) => const SettingsScreen(),
+          ),
+        };
+        Navigator.of(context).push(route);
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: _HeaderMenuAction.travel,
+          height: 48,
+          child: Text(
+            '나의 여행 목록',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(color: AppTheme.primary),
+          ),
+        ),
+        PopupMenuItem(
+          value: _HeaderMenuAction.settings,
+          height: 48,
+          child: Text(
+            '환경 설정',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(color: AppTheme.primary),
+          ),
+        ),
+      ],
+      child: const Padding(
+        padding: EdgeInsets.all(4),
+        child: Icon(Icons.menu_rounded, size: 32, color: AppTheme.primary),
+      ),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.status});
+
   final String status;
-  final double total;
-  final double monthSpend;
-  final double progress;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
+        color: const Color(0xFFDCE8FF),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        status,
+        style: Theme.of(
+          context,
+        ).textTheme.labelLarge?.copyWith(color: AppTheme.primary),
+      ),
+    );
+  }
+}
+
+class _BudgetGauge extends StatelessWidget {
+  const _BudgetGauge({required this.progress});
+
+  final double progress;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 176,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned.fill(
+            child: CustomPaint(painter: _GaugePainter(progress: progress)),
+          ),
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                '전체 예산 중',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: const Color(0xFF8D96A8),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${(progress * 100).round()}%',
+                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                  fontSize: 38,
+                  color: AppTheme.primary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '사용했어요',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: const Color(0xFF8D96A8),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GaugePainter extends CustomPainter {
+  const _GaugePainter({required this.progress});
+
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height);
+    final radius = math.min(size.width / 2, size.height) - 14;
+    const startAngle = math.pi;
+    const sweepAngle = math.pi;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+
+    final backgroundPaint = Paint()
+      ..color = const Color(0xFFF0F1F3)
+      ..strokeWidth = 24
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    final progressPaint = Paint()
+      ..color = AppTheme.primary
+      ..strokeWidth = 24
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawArc(rect, startAngle, sweepAngle, false, backgroundPaint);
+    canvas.drawArc(
+      rect,
+      startAngle,
+      sweepAngle * progress,
+      false,
+      progressPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _GaugePainter oldDelegate) {
+    return oldDelegate.progress != progress;
+  }
+}
+
+class _BudgetCard extends StatelessWidget {
+  const _BudgetCard({
+    required this.originalAmount,
+    required this.originalSymbol,
+    required this.currency,
+    required this.usedKrw,
+    required this.remainingKrw,
+  });
+
+  final double originalAmount;
+  final String originalSymbol;
+  final String currency;
+  final double usedKrw;
+  final double remainingKrw;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(28, 26, 28, 22),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
         gradient: const LinearGradient(
           colors: [AppTheme.primary, AppTheme.primaryStrong],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Row(
+          Positioned(
+            right: -10,
+            top: -6,
+            child: Icon(
+              Icons.euro_rounded,
+              size: 120,
+              color: Colors.white.withValues(alpha: 0.08),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text(
+                '지금까지 사용한 금액',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
+              ),
+              const SizedBox(height: 8),
+              RichText(
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text:
+                          '$originalSymbol${originalAmount.toStringAsFixed(2)}',
+                      style: Theme.of(context).textTheme.headlineLarge
+                          ?.copyWith(fontSize: 42, color: Colors.white),
+                    ),
+                    TextSpan(
+                      text: currency,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.titleMedium?.copyWith(color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '≈ ${NumberFormat('#,##0').format(usedKrw)}원 KRW',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(color: Colors.white70),
+              ),
+              const SizedBox(height: 34),
+              Row(
+                children: [
+                  Text(
+                    '잔여예산',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                  ),
+                  const SizedBox(width: 24),
+                  Text(
+                    '${NumberFormat('#,##0').format(remainingKrw)}원',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleMedium?.copyWith(color: Colors.white),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RecentExpenseTile extends StatelessWidget {
+  const _RecentExpenseTile({required this.record, required this.onTap});
+
+  final ReceiptRecord record;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFFFCFCFD),
+      borderRadius: BorderRadius.circular(22),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F7FB),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Icon(_categoryIcon(record), color: AppTheme.textPrimary),
+              ),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: Colors.white,
-                      ),
+                      '- ${RecordPresenter.amountWithSymbol(record.currency, record.originalAmount)}',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.titleLarge?.copyWith(color: AppTheme.primary),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
-                      subtitle,
+                      '${RecordPresenter.title(record)} (${RecordPresenter.locationLabel(record)}) | ${RecordPresenter.category(record)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.white70,
+                        color: const Color(0xFFB0B8C8),
                       ),
                     ),
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  status,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: Colors.white,
-                  ),
-                ),
-              ),
             ],
           ),
-          const SizedBox(height: 18),
-          Text(
-            '₩${NumberFormat('#,##0').format(total)}',
-            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '이번 달 지출 ₩${NumberFormat('#,##0').format(monthSpend)}',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: Colors.white70,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Text(
-                '예산 진행률',
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: Colors.white70,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '${(progress * 100).round()}%',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              minHeight: 10,
-              value: progress,
-              backgroundColor: Colors.white24,
-              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({
-    required this.label,
-    required this.value,
-    this.emphasized = false,
-  });
+class _EmptyRecentCard extends StatelessWidget {
+  const _EmptyRecentCard({required this.onTap});
 
-  final String label;
-  final String value;
-  final bool emphasized;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppTheme.line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 4,
-            height: 26,
-            decoration: BoxDecoration(
-              color: emphasized ? AppTheme.primaryStrong : AppTheme.primary,
-              borderRadius: BorderRadius.circular(999),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(label, style: Theme.of(context).textTheme.labelMedium),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: AppTheme.primary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RecentExpenseCard extends StatelessWidget {
-  const _RecentExpenseCard({
-    required this.record,
-    required this.onTap,
-  });
-
-  final dynamic record;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(26),
-      child: Ink(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(26),
-          border: Border.all(color: AppTheme.line),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 54,
-              height: 54,
-              decoration: BoxDecoration(
-                color: const Color(0xFFEEF4FF),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Icon(_categoryIcon(record), color: AppTheme.primary),
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFCFCFD),
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.receipt_long_rounded,
+            color: AppTheme.primary,
+            size: 42,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '아직 저장된 지출이 없어요',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '영수증 스캔이나 직접 입력으로 첫 지출을 추가해 주세요.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: onTap,
+            style: ElevatedButton.styleFrom(minimumSize: const Size(180, 50)),
+            child: const Text('상세 내역 추가'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TravelSummaryCard extends StatelessWidget {
+  const _TravelSummaryCard({required this.record});
+
+  final ReceiptRecord record;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F9FC),
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              color: const Color(0xFFDCE8FF),
+              borderRadius: BorderRadius.circular(18),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${RecordPresenter.flag(record.countryCode)} ${RecordPresenter.title(record)}',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${RecordPresenter.category(record)} · ${RecordPresenter.relativeDate(record.date)}',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
+            child: Center(
+              child: Text(
+                RecordPresenter.flag(record.countryCode),
+                style: const TextStyle(fontSize: 24),
               ),
             ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '₩${NumberFormat('#,##0').format(RecordPresenter.totalWithTip(record))}',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: AppTheme.primary,
-                  ),
+                  '최근 여행 메모',
+                  style: Theme.of(context).textTheme.labelMedium,
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  RecordPresenter.amountWithSymbol(record.currency, record.originalAmount),
+                  RecordPresenter.title(record),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  RecordPresenter.shortDate(record.date),
                   style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TravelPlaceholderCard extends StatelessWidget {
+  const _TravelPlaceholderCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F9FC),
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              color: const Color(0xFFDCE8FF),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Icon(
+              Icons.travel_explore_rounded,
+              color: AppTheme.primary,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('여행 준비 중', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 4),
+                Text(
+                  '첫 영수증을 추가하면 여행 요약이 여기에 표시됩니다.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AddExpenseSheet extends StatelessWidget {
+  const _AddExpenseSheet({required this.onScanTap, required this.onManualTap});
+
+  final VoidCallback onScanTap;
+  final VoidCallback onManualTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 284),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(36)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 18, 24, 32),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                const Spacer(),
+                Text(
+                  '상세 내역 추가',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontSize: 18),
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                  color: const Color(0xFFB7BEC9),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _ActionCard(
+                    backgroundColor: AppTheme.primary,
+                    iconBackground: Colors.white.withValues(alpha: 0.14),
+                    icon: Icons.photo_camera_outlined,
+                    label: '영수증 스캔',
+                    labelColor: Colors.white,
+                    onTap: onScanTap,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: _ActionCard(
+                    backgroundColor: const Color(0xFFF2F3F5),
+                    iconBackground: const Color(0xFFE7EBF3),
+                    icon: Icons.edit_outlined,
+                    label: '직접 입력',
+                    labelColor: AppTheme.primary,
+                    onTap: onManualTap,
+                  ),
                 ),
               ],
             ),
@@ -403,46 +765,23 @@ class _RecentExpenseCard extends StatelessWidget {
   }
 }
 
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.onTap});
+enum _HeaderMenuAction { travel, settings }
 
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: AppTheme.line),
-      ),
-      child: Column(
-        children: [
-          const Icon(Icons.receipt_long_rounded, size: 48, color: AppTheme.primary),
-          const SizedBox(height: 12),
-          Text('저장된 영수증이 없습니다.', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          Text(
-            '첫 영수증을 스캔하면 대시보드가 실제 데이터로 채워집니다.',
-            style: Theme.of(context).textTheme.bodyMedium,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(onPressed: onTap, child: const Text('영수증 스캔하기')),
-        ],
-      ),
-    );
-  }
-}
-
-class _ScanCta extends StatelessWidget {
-  const _ScanCta({
-    required this.recordCount,
+class _ActionCard extends StatelessWidget {
+  const _ActionCard({
+    required this.backgroundColor,
+    required this.iconBackground,
+    required this.icon,
+    required this.label,
+    required this.labelColor,
     required this.onTap,
   });
 
-  final int recordCount;
+  final Color backgroundColor;
+  final Color iconBackground;
+  final IconData icon;
+  final String label;
+  final Color labelColor;
   final VoidCallback onTap;
 
   @override
@@ -451,63 +790,29 @@ class _ScanCta extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(28),
       child: Ink(
-        height: 150,
+        height: 164,
         decoration: BoxDecoration(
+          color: backgroundColor,
           borderRadius: BorderRadius.circular(28),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF93C5FD), Color(0xFF2563EB)],
-          ),
         ),
-        child: Stack(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Positioned(
-              left: 22,
-              top: 22,
-              right: 110,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '새 영수증 스캔',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '촬영 또는 갤러리에서 불러와 OCR과 AI 분석을 바로 시작합니다.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.86),
-                    ),
-                  ),
-                ],
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                color: iconBackground,
+                shape: BoxShape.circle,
               ),
+              child: Icon(icon, color: labelColor, size: 30),
             ),
-            Positioned(
-              left: 22,
-              bottom: 18,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  recordCount == 0 ? '첫 분석 시작하기' : '$recordCount건 저장됨',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-            const Positioned(
-              right: 18,
-              bottom: 18,
-              child: CircleAvatar(
-                radius: 28,
-                backgroundColor: Colors.white,
-                child: Icon(Icons.camera_alt_rounded, color: AppTheme.primaryStrong),
-              ),
+            const SizedBox(height: 18),
+            Text(
+              label,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: labelColor),
             ),
           ],
         ),
@@ -516,15 +821,15 @@ class _ScanCta extends StatelessWidget {
   }
 }
 
-IconData _categoryIcon(dynamic record) {
+IconData _categoryIcon(ReceiptRecord record) {
   switch (RecordPresenter.category(record)) {
     case '교통':
-      return Icons.train_rounded;
+      return Icons.luggage_rounded;
     case '숙박':
-      return Icons.bed_outlined;
+      return Icons.hotel_rounded;
     case '쇼핑':
       return Icons.shopping_bag_outlined;
     default:
-      return Icons.restaurant_outlined;
+      return Icons.restaurant_rounded;
   }
 }

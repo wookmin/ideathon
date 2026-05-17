@@ -25,14 +25,19 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     final records = ref.watch(ledgerProvider);
     final filtered = records.where((record) {
       final querySource =
-          '${record.memo} ${record.country} ${record.city} ${record.rawOcrText}'.toLowerCase();
+          '${record.memo} ${record.country} ${record.city} ${record.rawOcrText}'
+              .toLowerCase();
       final matchesQuery =
-          _searchQuery.isEmpty || querySource.contains(_searchQuery.toLowerCase());
+          _searchQuery.isEmpty ||
+          querySource.contains(_searchQuery.toLowerCase());
       final category = RecordPresenter.category(record);
-      final matchesFilter = _filter == '전체' ||
+      final matchesFilter =
+          _filter == '전체' ||
           _filter == category ||
           (_filter == '최근 30일' &&
-              record.date.isAfter(DateTime.now().subtract(const Duration(days: 30))));
+              record.date.isAfter(
+                DateTime.now().subtract(const Duration(days: 30)),
+              ));
       return matchesQuery && matchesFilter;
     }).toList();
     final grouped = _groupByDate(filtered);
@@ -66,29 +71,30 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                       children: [
                         Text(
                           '이번 달 총 지출',
-                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            color: Colors.white70,
-                          ),
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(color: Colors.white70),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           '₩${NumberFormat('#,##0').format(monthTotal)}',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Colors.white,
-                          ),
+                          style: Theme.of(
+                            context,
+                          ).textTheme.titleLarge?.copyWith(color: Colors.white),
                         ),
                       ],
                     ),
                   ),
                   Text(
                     '${filtered.length}건',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleMedium?.copyWith(color: Colors.white),
                   ),
                 ],
               ),
             ),
           ),
-          const MainBottomNav(currentIndex: 2),
+          const MainBottomNav(currentIndex: 0),
         ],
       ),
       body: SafeArea(
@@ -110,7 +116,14 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 children: [
-                  for (final filter in const ['전체', '최근 30일', '식비', '교통', '숙박', '쇼핑'])
+                  for (final filter in const [
+                    '전체',
+                    '최근 30일',
+                    '식비',
+                    '교통',
+                    '숙박',
+                    '쇼핑',
+                  ])
                     Padding(
                       padding: const EdgeInsets.only(right: 10),
                       child: ChoiceChip(
@@ -120,7 +133,9 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                         selectedColor: AppTheme.primary,
                         backgroundColor: AppTheme.surface,
                         labelStyle: TextStyle(
-                          color: _filter == filter ? Colors.white : AppTheme.textPrimary,
+                          color: _filter == filter
+                              ? Colors.white
+                              : AppTheme.textPrimary,
                           fontWeight: FontWeight.w700,
                         ),
                         shape: RoundedRectangleBorder(
@@ -141,7 +156,10 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
               for (final entry in grouped.entries) ...[
                 Row(
                   children: [
-                    Text(entry.key, style: Theme.of(context).textTheme.titleLarge),
+                    Text(
+                      entry.key,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
                     const Spacer(),
                     Text(
                       RecordPresenter.monthLabel(entry.value.first.date),
@@ -163,7 +181,10 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                           color: AppTheme.bad.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(22),
                         ),
-                        child: const Icon(Icons.delete_outline, color: AppTheme.bad),
+                        child: const Icon(
+                          Icons.delete_outline,
+                          color: AppTheme.bad,
+                        ),
                       ),
                       onDismissed: (_) {
                         ref.read(ledgerProvider.notifier).delete(record.id);
@@ -173,7 +194,8 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => LedgerDetailScreen(record: record),
+                              builder: (_) =>
+                                  LedgerDetailScreen(record: record),
                             ),
                           );
                         },
@@ -227,10 +249,7 @@ class _Header extends StatelessWidget {
 }
 
 class _LedgerCard extends StatelessWidget {
-  const _LedgerCard({
-    required this.record,
-    required this.onTap,
-  });
+  const _LedgerCard({required this.record, required this.onTap});
 
   final ReceiptRecord record;
   final VoidCallback onTap;
@@ -285,10 +304,13 @@ class _LedgerCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  RecordPresenter.amountWithSymbol(record.currency, record.originalAmount),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: AppTheme.primary,
+                  RecordPresenter.amountWithSymbol(
+                    record.currency,
+                    record.originalAmount,
                   ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleMedium?.copyWith(color: AppTheme.primary),
                 ),
                 const SizedBox(height: 4),
                 Text(
