@@ -8,6 +8,7 @@ import '../config/app_colors.dart';
 import '../models/recommend_place.dart';
 import '../providers/recommendation_provider.dart';
 import '../widgets/category_chip_bar.dart';
+import '../widgets/main_bottom_nav.dart';
 import '../widgets/recommendation_bottom_card.dart';
 import '../widgets/shimmer_map_loading.dart';
 
@@ -36,6 +37,7 @@ class _AIRecommendationScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
+      bottomNavigationBar: const MainBottomNav(currentIndex: 2),
       body: Consumer<RecommendationProvider>(
         builder: (context, provider, child) {
           if (provider.currentPosition == null) {
@@ -74,9 +76,7 @@ class _AIRecommendationScreenState
                     ),
                     child: Container(
                       height: 145,
-                      color: Colors.white.withOpacity(
-                        0.78,
-                      ),
+                      color: Colors.white.withValues(alpha: 0.78),
                     ),
                   ),
                 ),
@@ -124,8 +124,7 @@ class _AIRecommendationScreenState
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black
-                              .withOpacity(0.08),
+                          color: Colors.black.withValues(alpha: 0.08),
                           blurRadius: 18,
                           offset: const Offset(0, 8),
                         ),

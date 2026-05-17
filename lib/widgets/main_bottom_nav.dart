@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../config/theme.dart';
+import '../screens/ai_recommendation_screen.dart';
 import '../screens/analysis_screen.dart';
 import '../screens/home_screen.dart';
 
@@ -59,18 +60,12 @@ class MainBottomNav extends StatelessWidget {
       return;
     }
 
-    if (index == 2) {
-      return;
-    }
-
     final route = switch (index) {
       0 => MaterialPageRoute(builder: (_) => const AnalysisScreen()),
       1 => MaterialPageRoute(builder: (_) => const HomeScreen()),
-      _ => null,
+      _ => MaterialPageRoute(builder: (_) => const AIRecommendationScreen()),
     };
-    if (route != null) {
-      Navigator.of(context).pushAndRemoveUntil(route, (route) => route.isFirst);
-    }
+    Navigator.of(context).pushAndRemoveUntil(route, (route) => route.isFirst);
   }
 }
 

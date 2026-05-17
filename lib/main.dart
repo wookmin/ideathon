@@ -8,6 +8,8 @@ import 'config/theme.dart';
 import 'models/receipt_analysis.dart';
 import 'models/receipt_record.dart';
 import 'providers/ledger_provider.dart';
+import 'providers/travel_provider.dart';
+import 'models/travel.dart';
 import 'screens/home_screen.dart';
 import 'services/camera_service.dart';
 
@@ -20,10 +22,12 @@ Future<void> main() async {
   Hive
     ..registerAdapter(ReceiptItemAdapter())
     ..registerAdapter(ReceiptRecordAdapter())
+    ..registerAdapter(TravelAdapter())
     ..registerAdapter(ReceiptAnalysisItemAdapter())
     ..registerAdapter(ReceiptAnalysisAdapter());
 
   await Hive.openBox<ReceiptRecord>(ledgerBoxName);
+  await Hive.openBox<Travel>(travelBoxName);
 
   runApp(const ProviderScope(child: TripReceiptApp()));
 }

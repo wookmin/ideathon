@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../config/app_colors.dart';
 import '../models/recommend_place.dart';
-import '../utils/map_utils.dart';
 
 class RecommendationBottomCard extends StatelessWidget {
   final RecommendPlace place;

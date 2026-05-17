@@ -116,7 +116,7 @@ class HomeScreen extends ConsumerWidget {
         return record.currency;
       }
     }
-    return records.isEmpty ? 'EUR' : records.first.currency;
+    return records.isEmpty ? 'KRW' : records.first.currency;
   }
 
   double _displayOriginalAmount(List<ReceiptRecord> records, String currency) {
