@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -48,33 +46,34 @@ class _AIRecommendationScreenState
             )
           : Stack(
               children: [
-                GoogleMap(
-                  initialCameraPosition: CameraPosition(
-                    target: provider.currentPosition!,
-                    zoom: 15,
+                Positioned.fill(
+                  child: GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: provider.currentPosition!,
+                      zoom: 15,
+                    ),
+                    myLocationEnabled: false,
+                    myLocationButtonEnabled: false,
+                    zoomControlsEnabled: false,
+                    compassEnabled: false,
+                    mapToolbarEnabled: false,
+                    onMapCreated: provider.onMapCreated,
+                    markers: _buildMarkers(provider),
                   ),
-                  myLocationEnabled: false,
-                  myLocationButtonEnabled: false,
-                  zoomControlsEnabled: false,
-                  compassEnabled: false,
-                  mapToolbarEnabled: false,
-                  onMapCreated: provider.onMapCreated,
-                  markers: _buildMarkers(provider),
                 ),
 
                 Positioned(
                   top: 0,
                   left: 0,
                   right: 0,
-                  child: ClipRect(
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(
-                        sigmaX: 18,
-                        sigmaY: 18,
-                      ),
-                      child: Container(
-                        height: 145,
-                        color: Colors.white.withValues(alpha: 0.78),
+                  child: Container(
+                    height: 145,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.92),
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.35),
+                        ),
                       ),
                     ),
                   ),

@@ -441,7 +441,7 @@ class _BudgetCard extends StatelessWidget {
             right: -10,
             top: -6,
             child: Icon(
-              Icons.euro_rounded,
+              _currencyWatermarkIcon(currency),
               size: 120,
               color: Colors.white.withValues(alpha: 0.08),
             ),
@@ -866,10 +866,9 @@ class _ActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(28),
-      child: Ink(
+      child: Container(
         height: 164,
         decoration: BoxDecoration(
           color: backgroundColor,
@@ -898,6 +897,27 @@ class _ActionCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+IconData _currencyWatermarkIcon(String currency) {
+  switch (currency) {
+    case 'USD':
+    case 'CAD':
+    case 'AUD':
+    case 'NZD':
+      return Icons.attach_money_rounded;
+    case 'EUR':
+      return Icons.euro_rounded;
+    case 'GBP':
+      return Icons.currency_pound_rounded;
+    case 'JPY':
+    case 'CNY':
+      return Icons.currency_yen_rounded;
+    case 'KRW':
+      return Icons.monetization_on_outlined;
+    default:
+      return Icons.payments_outlined;
   }
 }
 

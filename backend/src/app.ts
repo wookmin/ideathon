@@ -5,25 +5,36 @@ import morgan from 'morgan';
 
 import { appEnv } from './config/env.js';
 import { errorHandler } from './middleware/error-handler.js';
-import { requireUser } from './middleware/require-user.js';
 import { CardsService } from './modules/cards/cards-service.js';
 import { CodefClient } from './modules/codef/codef-client.js';
+
+// 추가
 import { PlacesService } from './modules/places/places-service.js';
-import { FirestoreCardConnectionRepository } from './repositories/card-connection-repository.js';
-import { FirestoreCardTransactionRepository } from './repositories/card-transaction-repository.js';
+
+import {
+  InMemoryCardConnectionRepository,
+} from './repositories/card-connection-repository.js';
+import {
+  InMemoryCardTransactionRepository,
+} from './repositories/card-transaction-repository.js';
 import { createCardsRouter } from './routes/cards.js';
+
+// 추가
 import { createPlacesRouter } from './routes/places.js';
+
 import { healthRouter } from './routes/health.js';
 
 const codefClient = new CodefClient();
-const cardConnectionRepository = new FirestoreCardConnectionRepository();
-const cardTransactionRepository = new FirestoreCardTransactionRepository();
+const cardConnectionRepository = new InMemoryCardConnectionRepository();
+const cardTransactionRepository = new InMemoryCardTransactionRepository();
 
 const cardsService = new CardsService(
   codefClient,
   cardConnectionRepository,
   cardTransactionRepository,
 );
+
+// 추가
 const placesService = new PlacesService();
 
 export function createApp() {
@@ -55,9 +66,13 @@ export function createApp() {
   );
 
   app.use('/health', healthRouter);
-  app.use('/api/v1/places', requireUser, createPlacesRouter(placesService));
+
+   app.use('/api/v1/places', createPlacesRouter(placesService));
 
   app.use('/api/v1', createCardsRouter(cardsService));
+
+  // 추가
+ 
 
   app.use(errorHandler);
 

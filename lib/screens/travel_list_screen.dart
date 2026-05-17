@@ -160,14 +160,48 @@ class _TravelListScreenState extends ConsumerState<TravelListScreen> {
                             await ref
                                 .read(selectedTravelIdProvider.notifier)
                                 .select(travel.id);
-                            if (!context.mounted) {
-                              return;
-                            }
+                            if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
                                   '${travel.title}을(를) 메인 여행으로 적용했어요.',
                                 ),
+                              ),
+                            );
+                          },
+                          onDelete: () async {
+                            final confirmed = await showDialog<bool>(
+                              context: context,
+                              builder: (_) => AlertDialog(
+                                title: const Text('여행 삭제'),
+                                content: Text(
+                                  '\'${travel.title}\'을(를) 삭제할까요?\n이 작업은 되돌릴 수 없어요.',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.of(context).pop(false),
+                                    child: const Text('취소'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.of(context).pop(true),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: Colors.red,
+                                    ),
+                                    child: const Text('삭제'),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirmed != true || !context.mounted) return;
+                            await ref
+                                .read(travelProvider.notifier)
+                                .delete(travel.id);
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('\'${travel.title}\'을(를) 삭제했어요.'),
                               ),
                             );
                           },
@@ -189,11 +223,13 @@ class _TravelCard extends StatelessWidget {
     required this.summary,
     required this.isSelected,
     required this.onTap,
+    required this.onDelete,
   });
 
   final _TravelCardSummary summary;
   final bool isSelected;
   final VoidCallback onTap;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -274,9 +310,28 @@ class _TravelCard extends StatelessWidget {
                           ),
                         ],
                         const Spacer(),
-                        const Icon(
-                          Icons.more_vert_rounded,
-                          color: Color(0xFF7B8095),
+                        PopupMenuButton<String>(
+                          icon: const Icon(
+                            Icons.more_vert_rounded,
+                            color: Color(0xFF7B8095),
+                          ),
+                          onSelected: (value) {
+                            if (value == 'delete') onDelete();
+                          },
+                          itemBuilder: (_) => [
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.delete_outline_rounded,
+                                      color: Colors.red, size: 20),
+                                  SizedBox(width: 8),
+                                  Text('삭제',
+                                      style: TextStyle(color: Colors.red)),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
