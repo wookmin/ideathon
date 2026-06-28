@@ -4,8 +4,10 @@ import 'package:uuid/uuid.dart';
 
 import '../providers/exchange_provider.dart';
 import '../providers/ledger_provider.dart';
+import '../providers/travel_selection_provider.dart';
 import '../services/exchange_service.dart';
 import '../models/receipt_record.dart';
+import '../utils/budget_alert_presenter.dart';
 import '../widgets/main_bottom_nav.dart';
 
 class ManualEntryScreen extends ConsumerStatefulWidget {
@@ -41,7 +43,9 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
       return;
     }
 
-    final amount = double.tryParse(_amountController.text.trim().replaceAll(',', ''));
+    final amount = double.tryParse(
+      _amountController.text.trim().replaceAll(',', ''),
+    );
     if (amount == null) {
       return;
     }
@@ -56,17 +60,19 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
 
     setState(() => _saving = true);
     try {
-      final rate = _currency == 'KRW' ? 1.0 : (exchangeSnapshot?.rateFor(_currency) ?? 0);
+      final rate = _currency == 'KRW'
+          ? 1.0
+          : (exchangeSnapshot?.rateFor(_currency) ?? 0);
       final krwAmount = _currency == 'KRW'
           ? amount
           : ref
-                .read(exchangeServiceProvider)
-                .valueOrNull
-                ?.convertToKrw(
-                  originalAmount: amount,
-                  currency: _currency,
-                  snapshot: exchangeSnapshot!,
-                ) ??
+                    .read(exchangeServiceProvider)
+                    .valueOrNull
+                    ?.convertToKrw(
+                      originalAmount: amount,
+                      currency: _currency,
+                      snapshot: exchangeSnapshot!,
+                    ) ??
                 0;
 
       final record = ReceiptRecord(
@@ -92,12 +98,23 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
         analysis: '직접 입력으로 저장한 내역입니다.',
       );
 
+      final selectedTravel = ref.read(effectiveTravelProvider);
+      final recordsBeforeSave = scopedRecordsForTravel(
+        ref.read(ledgerProvider),
+        selectedTravel,
+      );
       await ref.read(ledgerProvider.notifier).add(record);
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('직접 입력 내역을 저장했습니다.')),
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('직접 입력 내역을 저장했습니다.')));
+      BudgetAlertPresenter.maybeShowAfterRecordSaved(
+        context: context,
+        travel: selectedTravel,
+        recordsBeforeSave: recordsBeforeSave,
+        savedRecord: record,
       );
       Navigator.of(context).pop();
     } finally {
@@ -128,8 +145,9 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
               controller: _countryController,
               decoration: const InputDecoration(labelText: '국가'),
               maxLength: 50,
-              validator: (value) =>
-                  (value == null || value.trim().isEmpty) ? '국가를 입력해 주세요.' : null,
+              validator: (value) => (value == null || value.trim().isEmpty)
+                  ? '국가를 입력해 주세요.'
+                  : null,
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -141,7 +159,9 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
             DropdownButtonFormField<String>(
               initialValue: _currency,
               items: ExchangeService.supportedCurrencies
-                  .map((code) => DropdownMenuItem(value: code, child: Text(code)))
+                  .map(
+                    (code) => DropdownMenuItem(value: code, child: Text(code)),
+                  )
                   .toList(),
               onChanged: (value) {
                 if (value != null) {
@@ -153,7 +173,9 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _amountController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               decoration: const InputDecoration(labelText: '금액'),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
@@ -209,10 +231,7 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
   }
 }
 
-String _inferCountryCode({
-  required String currency,
-  required String country,
-}) {
+String _inferCountryCode({required String currency, required String country}) {
   final normalizedCountry = country.trim().toLowerCase();
   if (normalizedCountry.contains('한국') || normalizedCountry.contains('korea')) {
     return 'KR';
@@ -220,7 +239,8 @@ String _inferCountryCode({
   if (normalizedCountry.contains('일본') || normalizedCountry.contains('japan')) {
     return 'JP';
   }
-  if (normalizedCountry.contains('미국') || normalizedCountry.contains('united states')) {
+  if (normalizedCountry.contains('미국') ||
+      normalizedCountry.contains('united states')) {
     return 'US';
   }
   return switch (currency) {

@@ -11,8 +11,10 @@ import '../models/receipt_record.dart';
 import '../models/tip_rule.dart';
 import '../providers/exchange_provider.dart';
 import '../providers/ledger_provider.dart';
+import '../providers/travel_selection_provider.dart';
 import '../services/exchange_service.dart';
 import '../services/gemini_service.dart';
+import '../utils/budget_alert_presenter.dart';
 import '../utils/record_presenter.dart';
 import '../widgets/main_bottom_nav.dart';
 import '../widgets/receipt_item_tile.dart';
@@ -60,7 +62,9 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     setState(() {
       _analysis = analysis;
       _selectedCurrency = analysis.currency;
-      _tipPct = analysis.tipSuggestedPct > 0 ? analysis.tipSuggestedPct : rule.suggested;
+      _tipPct = analysis.tipSuggestedPct > 0
+          ? analysis.tipSuggestedPct
+          : rule.suggested;
       _loading = false;
     });
   }
@@ -102,7 +106,8 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                 final perPerson = totalWithTipOriginal / 4;
                 final tipCulture = analysis.tipCulture.isNotEmpty
                     ? analysis.tipCulture
-                    : (tipRules[analysis.countryCode] ?? defaultTipRule).culture;
+                    : (tipRules[analysis.countryCode] ?? defaultTipRule)
+                          .culture;
 
                 return ListView(
                   padding: AppTheme.screenPadding.copyWith(top: 12, bottom: 32),
@@ -158,39 +163,32 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                                 ),
                                 child: Text(
                                   analysis.isFallback ? 'AI 분석 생략' : 'AI 분석 완료',
-                                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                    color: Colors.white,
-                                  ),
+                                  style: Theme.of(context).textTheme.labelLarge
+                                      ?.copyWith(color: Colors.white),
                                 ),
                               ),
-                              const Spacer(),
-                              if (!analysis.isFallback)
-                                VerdictBadge(
-                                  verdict: analysis.verdict,
-                                  label: analysis.verdictLabel,
-                                ),
                             ],
                           ),
                           const SizedBox(height: 18),
                           Text(
                             '${analysis.country} ${analysis.city}'.trim(),
-                            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                              color: Colors.white70,
-                            ),
+                            style: Theme.of(context).textTheme.labelLarge
+                                ?.copyWith(color: Colors.white70),
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            RecordPresenter.amountWithSymbol(currency, analysis.totalAmount),
-                            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                              color: Colors.white,
+                            RecordPresenter.amountWithSymbol(
+                              currency,
+                              analysis.totalAmount,
                             ),
+                            style: Theme.of(context).textTheme.headlineLarge
+                                ?.copyWith(color: Colors.white),
                           ),
                           const SizedBox(height: 8),
                           Text(
                             '₩${NumberFormat('#,##0').format(amountKrw)}',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: Colors.white70,
-                            ),
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(color: Colors.white70),
                           ),
                         ],
                       ),
@@ -210,7 +208,12 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('통화', style: Theme.of(context).textTheme.labelMedium),
+                                Text(
+                                  '통화',
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.labelMedium,
+                                ),
                                 const SizedBox(height: 8),
                                 DropdownButtonFormField<String>(
                                   initialValue: currency,
@@ -229,7 +232,9 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                                     }
                                     setState(() => _selectedCurrency = value);
                                   },
-                                  decoration: const InputDecoration(labelText: '통화 수동 변경'),
+                                  decoration: const InputDecoration(
+                                    labelText: '통화 수동 변경',
+                                  ),
                                 ),
                               ],
                             ),
@@ -247,7 +252,12 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('팁 문화', style: Theme.of(context).textTheme.labelMedium),
+                                Text(
+                                  '팁 문화',
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.labelMedium,
+                                ),
                                 const SizedBox(height: 10),
                                 _CultureChip(label: tipCulture),
                                 const SizedBox(height: 12),
@@ -272,18 +282,25 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('팁 계산', style: Theme.of(context).textTheme.titleLarge),
+                          Text(
+                            '팁 계산',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
                           const SizedBox(height: 12),
                           Row(
                             children: [
                               for (final preset in [10.0, 15.0, 20.0])
                                 Expanded(
                                   child: Padding(
-                                    padding: EdgeInsets.only(right: preset == 20 ? 0 : 8),
+                                    padding: EdgeInsets.only(
+                                      right: preset == 20 ? 0 : 8,
+                                    ),
                                     child: _TipPresetButton(
                                       value: preset,
-                                      selected: _tipPct.round() == preset.round(),
-                                      onTap: () => setState(() => _tipPct = preset),
+                                      selected:
+                                          _tipPct.round() == preset.round(),
+                                      onTap: () =>
+                                          setState(() => _tipPct = preset),
                                     ),
                                   ),
                                 ),
@@ -294,7 +311,8 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                             value: _tipPct,
                             min: 0,
                             max: 30,
-                            onChanged: (value) => setState(() => _tipPct = value),
+                            onChanged: (value) =>
+                                setState(() => _tipPct = value),
                           ),
                           if (analysis.hasServiceCharge) ...[
                             const SizedBox(height: 12),
@@ -318,12 +336,16 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                             children: [
                               _SummaryMetric(
                                 label: '팁 금액',
-                                value: RecordPresenter.amountWithSymbol(currency, tipOriginal),
+                                value: RecordPresenter.amountWithSymbol(
+                                  currency,
+                                  tipOriginal,
+                                ),
                               ),
                               const Spacer(),
                               _SummaryMetric(
                                 label: 'KRW 팁',
-                                value: '₩${NumberFormat('#,##0').format(tipKrw)}',
+                                value:
+                                    '₩${NumberFormat('#,##0').format(tipKrw)}',
                                 alignEnd: true,
                               ),
                             ],
@@ -344,7 +366,10 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                               const Spacer(),
                               _SummaryMetric(
                                 label: '1인당 금액(4인)',
-                                value: RecordPresenter.amountWithSymbol(currency, perPerson),
+                                value: RecordPresenter.amountWithSymbol(
+                                  currency,
+                                  perPerson,
+                                ),
                                 emphasize: true,
                                 alignEnd: true,
                               ),
@@ -364,14 +389,16 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.lightbulb_outline, color: AppTheme.primary),
+                          const Icon(
+                            Icons.lightbulb_outline,
+                            color: AppTheme.primary,
+                          ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
                               analysis.analysis,
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppTheme.primaryStrong,
-                              ),
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(color: AppTheme.primaryStrong),
                             ),
                           ),
                         ],
@@ -388,22 +415,9 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  analysis.summary,
-                                  style: Theme.of(context).textTheme.titleLarge,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              VerdictBadge(
-                                verdict: analysis.verdict,
-                                label: analysis.isFallback
-                                    ? '분석 실패'
-                                    : '${analysis.verdictEmoji} ${analysis.verdictLabel}',
-                              ),
-                            ],
+                          Text(
+                            analysis.summary,
+                            style: Theme.of(context).textTheme.titleLarge,
                           ),
                           const SizedBox(height: 14),
                           Text(
@@ -443,7 +457,10 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('품목 비교', style: Theme.of(context).textTheme.titleLarge),
+                          Text(
+                            '품목 비교',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
                           const SizedBox(height: 10),
                           if (analysis.items.isEmpty)
                             Text(
@@ -476,13 +493,22 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                           krwAmount: amountKrw,
                           exchangeRate: rate,
                           rawOcrText: widget.ocrText,
-                          items: analysis.items.map(ReceiptItem.fromAnalysis).toList(),
+                          items: analysis.items
+                              .map(ReceiptItem.fromAnalysis)
+                              .toList(),
                           verdict: analysis.verdict,
                           tipPct: _tipPct,
                           tipKrw: tipKrw,
                           memo: _memo,
                           imagePath: widget.imagePath,
                           analysis: analysis.analysis,
+                        );
+                        final selectedTravel = ref.read(
+                          effectiveTravelProvider,
+                        );
+                        final recordsBeforeSave = scopedRecordsForTravel(
+                          ref.read(ledgerProvider),
+                          selectedTravel,
                         );
                         await ref.read(ledgerProvider.notifier).add(record);
                         if (!context.mounted) {
@@ -491,11 +517,44 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('가계부에 저장했습니다.')),
                         );
-                        Navigator.of(context).popUntil((route) => route.isFirst);
+                        BudgetAlertPresenter.maybeShowAfterRecordSaved(
+                          context: context,
+                          travel: selectedTravel,
+                          recordsBeforeSave: recordsBeforeSave,
+                          savedRecord: record,
+                        );
+                        Navigator.of(
+                          context,
+                        ).popUntil((route) => route.isFirst);
                       },
                       child: const Text('가계부에 저장하기'),
                     ),
                     const SizedBox(height: 12),
+                    if (!analysis.isFallback)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surface,
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(color: AppTheme.line),
+                        ),
+                        child: ExpansionTile(
+                          title: const Text('바가지 판정 보기 (참고용)'),
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: VerdictBadge(
+                                  verdict: analysis.verdict,
+                                  label:
+                                      '${analysis.verdictEmoji} ${analysis.verdictLabel}',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     Container(
                       decoration: BoxDecoration(
                         color: AppTheme.surface,
@@ -504,10 +563,17 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                       ),
                       child: ExpansionTile(
                         title: const Text('OCR 원문 보기'),
-                        childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                        childrenPadding: const EdgeInsets.fromLTRB(
+                          20,
+                          0,
+                          20,
+                          20,
+                        ),
                         children: [
                           Text(
-                            widget.ocrText.isEmpty ? '추출된 텍스트가 없습니다.' : widget.ocrText,
+                            widget.ocrText.isEmpty
+                                ? '추출된 텍스트가 없습니다.'
+                                : widget.ocrText,
                             style: Theme.of(context).textTheme.labelSmall,
                           ),
                         ],
@@ -516,7 +582,8 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                   ],
                 );
               },
-              error: (error, _) => Center(child: Text('환율 정보를 불러오지 못했습니다.\n$error')),
+              error: (error, _) =>
+                  Center(child: Text('환율 정보를 불러오지 못했습니다.\n$error')),
               loading: () => const Center(child: CircularProgressIndicator()),
             ),
     );
@@ -546,24 +613,26 @@ class _FailureBanner extends StatelessWidget {
               const SizedBox(width: 10),
               Text(
                 'AI 실패 원인',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppTheme.bad,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(color: AppTheme.bad),
               ),
             ],
           ),
           const SizedBox(height: 12),
           Text(
             analysis.failureReason ?? 'AI 분석에 실패했습니다.',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: AppTheme.bad),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(color: AppTheme.bad),
           ),
           if ((analysis.failureDetail ?? '').trim().isNotEmpty) ...[
             const SizedBox(height: 10),
             Text(
               analysis.failureDetail!,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: AppTheme.textSecondary,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.labelSmall?.copyWith(color: AppTheme.textSecondary),
             ),
           ],
         ],
@@ -593,7 +662,9 @@ class _TipPresetButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected ? AppTheme.primary : AppTheme.surface,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: selected ? AppTheme.primary : AppTheme.line),
+          border: Border.all(
+            color: selected ? AppTheme.primary : AppTheme.line,
+          ),
         ),
         child: Center(
           child: Text(
@@ -668,19 +739,24 @@ class _SummaryMetric extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment: alignEnd
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Colors.white70),
+          style: Theme.of(
+            context,
+          ).textTheme.labelMedium?.copyWith(color: Colors.white70),
         ),
         const SizedBox(height: 6),
         Text(
           value,
-          style: (emphasize
-                  ? Theme.of(context).textTheme.headlineMedium
-                  : Theme.of(context).textTheme.titleLarge)
-              ?.copyWith(color: Colors.white),
+          style:
+              (emphasize
+                      ? Theme.of(context).textTheme.headlineMedium
+                      : Theme.of(context).textTheme.titleLarge)
+                  ?.copyWith(color: Colors.white),
         ),
       ],
     );

@@ -9,6 +9,7 @@ import '../models/receipt_record.dart';
 import '../models/travel.dart';
 import '../providers/ledger_provider.dart';
 import '../providers/travel_selection_provider.dart';
+import '../services/budget_forecast_service.dart';
 import '../utils/record_presenter.dart';
 import '../widgets/header_menu_overlay.dart';
 import '../widgets/main_bottom_nav.dart';
@@ -31,7 +32,14 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
     final records = ref.watch(ledgerProvider);
     final selectedTravel = ref.watch(effectiveTravelProvider);
     final scopedRecords = scopedRecordsForTravel(records, selectedTravel);
-    final summary = _AnalysisSummary.fromRecords(scopedRecords);
+    final forecast = const BudgetForecastService().calculate(
+      travel: selectedTravel,
+      records: scopedRecords,
+    );
+    final summary = _AnalysisSummary.fromRecords(
+      scopedRecords,
+      forecast: forecast,
+    );
     final budget =
         selectedTravel?.budgetKrw ?? RecordPresenter.budgetGoal(records);
     final displayCurrency = _displayCurrency(scopedRecords, selectedTravel);
@@ -91,6 +99,8 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                   ).textTheme.bodyLarge?.copyWith(color: AppTheme.primary),
                 ),
                 const SizedBox(height: 22),
+                _ForecastInsightCard(forecast: forecast),
+                const SizedBox(height: 20),
                 _CategorySpendCard(summary: summary),
                 const SizedBox(height: 20),
                 _AnalysisBudgetCard(
@@ -150,6 +160,59 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
           sum +
           record.originalAmount +
           record.originalAmount * (record.tipPct / 100),
+    );
+  }
+}
+
+class _ForecastInsightCard extends StatelessWidget {
+  const _ForecastInsightCard({required this.forecast});
+
+  final BudgetForecast forecast;
+
+  @override
+  Widget build(BuildContext context) {
+    final won = NumberFormat('#,##0');
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFBFBFC),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              Icons.notifications_active_outlined,
+              color: AppTheme.primary,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '결제 전 절제 기준',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  forecast.travel == null
+                      ? '여행 예산을 먼저 설정하면 위험 장소 진입 알림을 만들 수 있어요.'
+                      : '오늘 ${won.format(forecast.safeDailyBudgetKrw)}원을 넘기는 결제는 멈칫 알림 대상이에요.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -437,7 +500,10 @@ class _AnalysisSummary {
 
   _CategoryAmount get leading => items.first;
 
-  factory _AnalysisSummary.fromRecords(List<ReceiptRecord> records) {
+  factory _AnalysisSummary.fromRecords(
+    List<ReceiptRecord> records, {
+    required BudgetForecast forecast,
+  }) {
     final totals = <String, double>{'식비': 0, '교통비': 0, '쇼핑': 0, '숙박': 0};
     for (final record in records) {
       final amount = RecordPresenter.totalWithTip(record);
@@ -478,15 +544,35 @@ class _AnalysisSummary {
     ]..sort((a, b) => b.amount.compareTo(a.amount));
 
     final leading = items.first;
-    final dailyAverage = RecordPresenter.dailyAverage(records);
-    final leadingSpend = dailyAverage == 0
-        ? leading.amount
-        : math.max(0, leading.amount - dailyAverage);
-    final insight = totalKrw == 0
-        ? '아직 분석할 지출 데이터가 없어요. 첫 영수증을 추가해 보세요.'
-        : '${leading.label}에서 하루 권장 사용 금액보다 ${NumberFormat('#,##0').format(leadingSpend)}원 사용 중이에요';
+    final insight = _forecastInsight(forecast, totalKrw, leading.label);
 
     return _AnalysisSummary(items: items, totalKrw: totalKrw, insight: insight);
+  }
+
+  static String _forecastInsight(
+    BudgetForecast forecast,
+    double totalKrw,
+    String leadingLabel,
+  ) {
+    final won = NumberFormat('#,##0');
+    if (forecast.status == ForecastStatus.noTravel) {
+      return '여행 예산을 설정하면 남은 일수 기준으로 소진 시점을 예측해요';
+    }
+    if (totalKrw == 0 || forecast.status == ForecastStatus.noSpend) {
+      return '아직 분석할 지출 데이터가 없어요. 첫 영수증을 추가해 보세요.';
+    }
+    if (forecast.status == ForecastStatus.depleted) {
+      return '예산을 이미 초과했어요. 다음 결제 전 절제 알림을 강하게 띄울게요.';
+    }
+
+    final depletionDate = forecast.projectedDepletionDate;
+    if (depletionDate != null && forecast.travel != null) {
+      final start = BudgetForecastService.dateOnly(forecast.travel!.startDate);
+      final tripDay = depletionDate.difference(start).inDays + 1;
+      return '현재 속도면 $tripDay일차에 예산이 소진돼요. 오늘 안전 소비 가능액은 ${won.format(forecast.safeDailyBudgetKrw)}원입니다.';
+    }
+
+    return '$leadingLabel 지출이 가장 커요. 오늘 안전 소비 가능액은 ${won.format(forecast.safeDailyBudgetKrw)}원입니다.';
   }
 }
 

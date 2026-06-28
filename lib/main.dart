@@ -13,9 +13,11 @@ import 'providers/travel_selection_provider.dart';
 import 'providers/travel_provider.dart';
 import 'screens/home_screen.dart';
 import 'services/camera_service.dart';
+import 'utils/map_plugin_initializer.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  initializeMapPlugin();
   await initializeDateFormatting('ko');
   await CameraService.warmUp();
 

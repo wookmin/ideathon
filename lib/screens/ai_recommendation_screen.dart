@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/app_colors.dart';
+import '../providers/ledger_provider.dart';
 import '../providers/recommendation_provider.dart';
+import '../providers/travel_selection_provider.dart';
+import '../services/budget_forecast_service.dart';
+import '../services/demo_location_trigger_source.dart';
 import '../widgets/category_chip_bar.dart';
 import '../widgets/main_bottom_nav.dart';
 import '../widgets/recommendation_map_view.dart';
@@ -31,17 +35,44 @@ class _AIRecommendationScreenState
   @override
   Widget build(BuildContext context) {
     final provider = ref.watch(recommendationProvider);
+    final records = ref.watch(ledgerProvider);
+    final selectedTravel = ref.watch(effectiveTravelProvider);
+    final scopedRecords = scopedRecordsForTravel(records, selectedTravel);
+    final forecast = const BudgetForecastService().calculate(
+      travel: selectedTravel,
+      records: scopedRecords,
+    );
+    const triggerSource = DemoLocationTriggerSource();
 
     return Scaffold(
       backgroundColor: AppColors.background,
       bottomNavigationBar: const MainBottomNav(currentIndex: 2),
       body: provider.currentPosition == null
-          ? _RecommendationStatusView(
-              isLoading: provider.isLoading,
-              message: provider.errorMessage,
-              onRetry: () {
-                ref.read(recommendationProvider).initialize();
-              },
+          ? Stack(
+              children: [
+                _RecommendationStatusView(
+                  isLoading: provider.isLoading,
+                  message: provider.errorMessage,
+                  onRetry: () {
+                    ref.read(recommendationProvider).initialize();
+                  },
+                ),
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                    child: _DemoTriggerPanel(
+                      triggers: triggerSource.triggers,
+                      onTrigger: (trigger) => _showDemoAlert(
+                        context,
+                        triggerSource.candidateFor(
+                          trigger: trigger,
+                          forecast: forecast,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             )
           : Stack(
               children: [
@@ -84,6 +115,20 @@ class _AIRecommendationScreenState
                           onSelected: (category) {
                             provider.changeCategory(category);
                           },
+                        ),
+                        const SizedBox(height: 12),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: _DemoTriggerPanel(
+                            triggers: triggerSource.triggers,
+                            onTrigger: (trigger) => _showDemoAlert(
+                              context,
+                              triggerSource.candidateFor(
+                                trigger: trigger,
+                                forecast: forecast,
+                              ),
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -135,12 +180,9 @@ class _AIRecommendationScreenState
                   ),
 
                 if (provider.isLoading)
-                  const Positioned.fill(
-                    child: ShimmerMapLoading(),
-                  ),
+                  const Positioned.fill(child: ShimmerMapLoading()),
 
-                if (provider.errorMessage != null &&
-                    !provider.isLoading)
+                if (provider.errorMessage != null && !provider.isLoading)
                   Positioned(
                     left: 16,
                     right: 16,
@@ -148,15 +190,164 @@ class _AIRecommendationScreenState
                     child: _InlineErrorCard(
                       message: provider.errorMessage!,
                       onRetry: () {
-                        ref
-                            .read(recommendationProvider)
-                            .fetchRecommendations();
+                        ref.read(recommendationProvider).fetchRecommendations();
                       },
                     ),
                   ),
               ],
             ),
     );
+  }
+
+  void _showDemoAlert(BuildContext context, AlertCandidate candidate) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _DemoAlertSheet(candidate: candidate),
+    );
+  }
+}
+
+class _DemoTriggerPanel extends StatelessWidget {
+  const _DemoTriggerPanel({required this.triggers, required this.onTrigger});
+
+  final List<DemoLocationTrigger> triggers;
+  final ValueChanged<DemoLocationTrigger> onTrigger;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      elevation: 8,
+      shadowColor: Colors.black.withValues(alpha: 0.08),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.location_searching_rounded,
+                  size: 18,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '결제 전 위치 알림 시연',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontSize: 15,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final trigger in triggers)
+                  OutlinedButton(
+                    onPressed: () => onTrigger(trigger),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 42),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      side: const BorderSide(color: AppColors.border),
+                    ),
+                    child: Text(trigger.placeType),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DemoAlertSheet extends StatelessWidget {
+  const _DemoAlertSheet({required this.candidate});
+
+  final AlertCandidate candidate;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: _statusColor(
+                      candidate.resultingStatus,
+                    ).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    Icons.pause_circle_outline_rounded,
+                    color: _statusColor(candidate.resultingStatus),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    candidate.placeName,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text(
+              candidate.message,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(color: AppColors.textPrimary),
+            ),
+            const SizedBox(height: 18),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('확인'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _statusColor(ForecastStatus status) {
+    return switch (status) {
+      ForecastStatus.safe || ForecastStatus.noSpend => AppColors.success,
+      ForecastStatus.caution => AppColors.warning,
+      ForecastStatus.danger || ForecastStatus.depleted => AppColors.danger,
+      ForecastStatus.noTravel => AppColors.primary,
+    };
   }
 }
 
@@ -174,9 +365,7 @@ class _RecommendationStatusView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     return Center(
@@ -202,10 +391,7 @@ class _RecommendationStatusView extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 18),
-            ElevatedButton(
-              onPressed: onRetry,
-              child: const Text('다시 시도'),
-            ),
+            ElevatedButton(onPressed: onRetry, child: const Text('다시 시도')),
           ],
         ),
       ),
@@ -214,10 +400,7 @@ class _RecommendationStatusView extends StatelessWidget {
 }
 
 class _InlineErrorCard extends StatelessWidget {
-  const _InlineErrorCard({
-    required this.message,
-    required this.onRetry,
-  });
+  const _InlineErrorCard({required this.message, required this.onRetry});
 
   final String message;
   final VoidCallback onRetry;
@@ -241,10 +424,7 @@ class _InlineErrorCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Icon(
-              Icons.info_outline_rounded,
-              color: AppColors.primary,
-            ),
+            const Icon(Icons.info_outline_rounded, color: AppColors.primary),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -258,10 +438,7 @@ class _InlineErrorCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            TextButton(
-              onPressed: onRetry,
-              child: const Text('재시도'),
-            ),
+            TextButton(onPressed: onRetry, child: const Text('재시도')),
           ],
         ),
       ),

@@ -9,6 +9,7 @@ import '../models/receipt_record.dart';
 import '../models/travel.dart';
 import '../providers/ledger_provider.dart';
 import '../providers/travel_selection_provider.dart';
+import '../services/budget_forecast_service.dart';
 import '../utils/record_presenter.dart';
 import '../widgets/header_menu_overlay.dart';
 import '../widgets/main_bottom_nav.dart';
@@ -34,6 +35,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final records = ref.watch(ledgerProvider);
     final selectedTravel = ref.watch(effectiveTravelProvider);
     final scopedRecords = scopedRecordsForTravel(records, selectedTravel);
+    final forecast = const BudgetForecastService().calculate(
+      travel: selectedTravel,
+      records: scopedRecords,
+    );
     final recent = scopedRecords.take(2).toList();
     final totalKrw = RecordPresenter.totalSpend(scopedRecords);
     final budget =
@@ -85,6 +90,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     padding: const EdgeInsets.fromLTRB(24, 22, 24, 28),
                     children: [
                       _BudgetGauge(progress: progress),
+                      const SizedBox(height: 16),
+                      _ForecastCard(forecast: forecast),
                       const SizedBox(height: 22),
                       _BudgetCard(
                         originalAmount: originalAmount,
@@ -228,6 +235,147 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           },
         );
       },
+    );
+  }
+}
+
+class _ForecastCard extends StatelessWidget {
+  const _ForecastCard({required this.forecast});
+
+  final BudgetForecast forecast;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _statusColor(forecast.status);
+    final title = _title;
+    final description = _description;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: color.withValues(alpha: 0.26)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(Icons.speed_rounded, color: color),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(description, style: Theme.of(context).textTheme.bodyMedium),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _ForecastMetric(
+                  label: '오늘 안전 소비',
+                  value:
+                      '${NumberFormat('#,##0').format(forecast.safeDailyBudgetKrw)}원',
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _ForecastMetric(
+                  label: '남은 일수',
+                  value: '${forecast.remainingDays}일',
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String get _title {
+    switch (forecast.status) {
+      case ForecastStatus.noTravel:
+        return '여행 예산을 설정하면 소진일을 예측해요';
+      case ForecastStatus.noSpend:
+        return '첫 지출이 들어오면 예측이 시작돼요';
+      case ForecastStatus.safe:
+        return '현재 속도는 예산 안에 있어요';
+      case ForecastStatus.caution:
+        return '소비 속도가 예산보다 조금 빨라요';
+      case ForecastStatus.danger:
+        return '이 속도면 예산이 먼저 소진돼요';
+      case ForecastStatus.depleted:
+        return '여행 예산을 이미 초과했어요';
+    }
+  }
+
+  String get _description {
+    final depletionDate = forecast.projectedDepletionDate;
+    if (forecast.status == ForecastStatus.noTravel) {
+      return '새 여행을 추가하고 총예산을 입력하면 결제 전 멈칫 알림을 만들 수 있어요.';
+    }
+    if (forecast.status == ForecastStatus.noSpend) {
+      return '영수증 스캔이나 직접 입력으로 첫 소비를 저장해 주세요.';
+    }
+    if (forecast.status == ForecastStatus.depleted) {
+      return '남은 예산이 0원입니다. 다음 결제 전에는 절제 알림을 강하게 띄웁니다.';
+    }
+    if (depletionDate != null && forecast.travel != null) {
+      final start = BudgetForecastService.dateOnly(forecast.travel!.startDate);
+      final tripDay = depletionDate.difference(start).inDays + 1;
+      return '하루 평균 ${NumberFormat('#,##0').format(forecast.dailyAverageKrw)}원 속도라면 $tripDay일차에 예산이 소진될 수 있어요.';
+    }
+    return '하루 평균 ${NumberFormat('#,##0').format(forecast.dailyAverageKrw)}원으로 쓰고 있어요.';
+  }
+
+  Color _statusColor(ForecastStatus status) {
+    return switch (status) {
+      ForecastStatus.safe || ForecastStatus.noSpend => AppTheme.ok,
+      ForecastStatus.caution => AppTheme.warn,
+      ForecastStatus.danger || ForecastStatus.depleted => AppTheme.bad,
+      ForecastStatus.noTravel => AppTheme.primary,
+    };
+  }
+}
+
+class _ForecastMetric extends StatelessWidget {
+  const _ForecastMetric({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.76),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: Theme.of(context).textTheme.labelMedium),
+          const SizedBox(height: 6),
+          Text(value, style: Theme.of(context).textTheme.titleMedium),
+        ],
+      ),
     );
   }
 }

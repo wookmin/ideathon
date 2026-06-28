@@ -33,7 +33,7 @@ Widget buildRecommendationMapView({
 
   return GoogleMap(
     initialCameraPosition: CameraPosition(
-      target: currentPosition,
+      target: selectedPlace?.position ?? currentPosition,
       zoom: 15,
     ),
     myLocationEnabled: false,
