@@ -166,7 +166,7 @@ class HeaderMenuOverlay extends StatelessWidget {
             ),
           ),
           Positioned(
-            top: 6,
+            top: 60,
             right: 0,
             child: Material(
               color: Colors.white,

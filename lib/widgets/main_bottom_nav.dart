@@ -6,9 +6,9 @@ import '../screens/analysis_screen.dart';
 import '../screens/home_screen.dart';
 
 class MainBottomNav extends StatelessWidget {
-  const MainBottomNav({super.key, required this.currentIndex});
+  const MainBottomNav({super.key, this.currentIndex});
 
-  final int currentIndex;
+  final int? currentIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -64,7 +64,7 @@ class MainBottomNav extends StatelessWidget {
       1 => const HomeScreen(),
       _ => const AIRecommendationScreen(),
     };
-    final forward = index > currentIndex;
+    final forward = currentIndex == null || index > currentIndex!;
     Navigator.of(context).pushAndRemoveUntil(
       _TabSlideRoute(page: page, forward: forward),
       (route) => route.isFirst,

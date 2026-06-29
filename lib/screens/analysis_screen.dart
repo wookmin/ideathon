@@ -70,7 +70,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                 ),
                 Expanded(
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(24, 28, 24, 96),
+                    padding: const EdgeInsets.fromLTRB(24, 14, 24, 96),
                     children: [
                       Text(
                         '여행 소비 내역 분석',
