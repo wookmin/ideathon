@@ -281,10 +281,7 @@ class _TripHeroCard extends StatelessWidget {
                     text: TextSpan(
                       style: Theme.of(context).textTheme.headlineMedium
                           ?.copyWith(color: Colors.white, height: 1.08),
-                      children: [
-                        TextSpan(text: dayLabel),
-                        const TextSpan(text: ' 까지'),
-                      ],
+                      children: [TextSpan(text: dayLabel)],
                     ),
                   ),
                   const SizedBox(height: 7),

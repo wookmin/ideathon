@@ -59,13 +59,34 @@ class MainBottomNav extends StatelessWidget {
       return;
     }
 
-    final route = switch (index) {
-      0 => MaterialPageRoute(builder: (_) => const AnalysisScreen()),
-      1 => MaterialPageRoute(builder: (_) => const HomeScreen()),
-      _ => MaterialPageRoute(builder: (_) => const AIRecommendationScreen()),
+    final page = switch (index) {
+      0 => const AnalysisScreen(),
+      1 => const HomeScreen(),
+      _ => const AIRecommendationScreen(),
     };
-    Navigator.of(context).pushAndRemoveUntil(route, (route) => route.isFirst);
+    final forward = index > currentIndex;
+    Navigator.of(context).pushAndRemoveUntil(
+      _TabSlideRoute(page: page, forward: forward),
+      (route) => route.isFirst,
+    );
   }
+}
+
+class _TabSlideRoute extends PageRouteBuilder {
+  _TabSlideRoute({required Widget page, required bool forward})
+    : super(
+        transitionDuration: const Duration(milliseconds: 280),
+        reverseTransitionDuration: const Duration(milliseconds: 280),
+        pageBuilder: (context, animation, secondaryAnimation) => page,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          final begin = Offset(forward ? 1 : -1, 0);
+          final tween = Tween(
+            begin: begin,
+            end: Offset.zero,
+          ).chain(CurveTween(curve: Curves.easeOutCubic));
+          return SlideTransition(position: animation.drive(tween), child: child);
+        },
+      );
 }
 
 class _NavItem extends StatelessWidget {
