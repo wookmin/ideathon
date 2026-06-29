@@ -11,6 +11,7 @@ import '../models/receipt_record.dart';
 import '../utils/budget_alert_presenter.dart';
 import '../utils/record_presenter.dart';
 import '../widgets/header_menu_overlay.dart';
+import 'after_save_screen.dart';
 import 'settings_screen.dart';
 import 'travel_list_screen.dart';
 
@@ -126,16 +127,16 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('직접 입력 내역을 저장했습니다.')));
       BudgetAlertPresenter.maybeShowAfterRecordSaved(
         context: context,
         travel: selectedTravel,
         recordsBeforeSave: recordsBeforeSave,
         savedRecord: record,
       );
-      Navigator.of(context).pop();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AfterSaveScreen()),
+        (route) => route.isFirst,
+      );
     } finally {
       if (mounted) {
         setState(() => _saving = false);

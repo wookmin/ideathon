@@ -46,9 +46,9 @@ class BudgetForecastDetailScreen extends ConsumerWidget {
                 Expanded(
                   child: Text(
                     travelTitle,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: AppTheme.primary,
-                    ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleMedium?.copyWith(color: AppTheme.primary),
                   ),
                 ),
               ],
@@ -57,8 +57,6 @@ class BudgetForecastDetailScreen extends ConsumerWidget {
             Text(period, style: Theme.of(context).textTheme.bodyMedium),
             const SizedBox(height: 18),
             _ForecastHeroCard(forecast: forecast),
-            const SizedBox(height: 28),
-            Text('이렇게 예측했어요', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 12),
             _ForecastBasisCard(forecast: forecast),
             const SizedBox(height: 20),
@@ -121,17 +119,18 @@ class _ForecastHeroCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 RichText(
                   text: TextSpan(
-                    style: Theme.of(context).textTheme.headlineMedium
-                        ?.copyWith(color: Colors.white, height: 1.08),
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: Colors.white,
+                      height: 1.08,
+                    ),
                     children: [
                       TextSpan(text: '$tripDay일 째'),
                       TextSpan(
                         text: ' 까지 갈 수 있어요',
-                        style: Theme.of(context).textTheme.bodyMedium
-                            ?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
@@ -139,9 +138,9 @@ class _ForecastHeroCard extends StatelessWidget {
               ] else
                 Text(
                   '여행을 추가하고 예산 알림을 시작해요',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: Colors.white,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.headlineMedium?.copyWith(color: Colors.white),
                 ),
               const SizedBox(height: 7),
               Text(
@@ -162,10 +161,14 @@ class _ForecastHeroCard extends StatelessWidget {
               const SizedBox(height: 6),
               RichText(
                 text: TextSpan(
-                  style: Theme.of(context).textTheme.headlineMedium
-                      ?.copyWith(color: Colors.white, height: 1.08),
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    color: Colors.white,
+                    height: 1.08,
+                  ),
                   children: [
-                    TextSpan(text: '₩${won.format(forecast.safeDailyBudgetKrw)}'),
+                    TextSpan(
+                      text: '₩${won.format(forecast.safeDailyBudgetKrw)}',
+                    ),
                     TextSpan(
                       text: ' 이하',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -267,10 +270,7 @@ class _BasisRow extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ),
-              Text(
-                value,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+              Text(value, style: Theme.of(context).textTheme.titleMedium),
             ],
           ),
         ),
@@ -408,7 +408,10 @@ class _InsightRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(insight.title, style: Theme.of(context).textTheme.titleMedium),
+              Text(
+                insight.title,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
               const SizedBox(height: 4),
               Text(insight.body, style: Theme.of(context).textTheme.bodyMedium),
             ],

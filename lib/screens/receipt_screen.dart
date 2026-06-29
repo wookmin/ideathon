@@ -14,6 +14,7 @@ import '../services/gemini_service.dart';
 import '../utils/budget_alert_presenter.dart';
 import '../utils/record_presenter.dart';
 import '../widgets/app_loading_screen.dart';
+import 'after_save_screen.dart';
 
 class ReceiptScreen extends ConsumerStatefulWidget {
   const ReceiptScreen({
@@ -331,16 +332,16 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('내역을 저장했습니다.')));
       BudgetAlertPresenter.maybeShowAfterRecordSaved(
         context: context,
         travel: selectedTravel,
         recordsBeforeSave: recordsBeforeSave,
         savedRecord: record,
       );
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AfterSaveScreen()),
+        (route) => route.isFirst,
+      );
     } finally {
       if (mounted) {
         setState(() => _saving = false);
