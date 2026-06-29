@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 
 import '../config/theme.dart';
 import '../models/receipt_record.dart';
-import '../models/travel.dart';
 import '../providers/ledger_provider.dart';
 import '../providers/travel_selection_provider.dart';
 import '../services/budget_forecast_service.dart';
@@ -40,22 +39,15 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
       scopedRecords,
       forecast: forecast,
     );
-    final budget =
-        selectedTravel?.budgetKrw ?? RecordPresenter.budgetGoal(records);
-    final displayCurrency = _displayCurrency(scopedRecords, selectedTravel);
-    final originalAmount = _displayOriginalAmount(
-      scopedRecords,
-      displayCurrency,
-    );
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8FAFE),
       bottomNavigationBar: const MainBottomNav(currentIndex: 0),
       body: SafeArea(
         child: Stack(
           children: [
             ListView(
-              padding: const EdgeInsets.fromLTRB(24, 10, 24, 28),
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 96),
               children: [
                 _AnalysisHeader(
                   onBackTap: () {
@@ -71,7 +63,10 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                 const SizedBox(height: 20),
                 Text(
                   '여행 소비 내역 분석',
-                  style: Theme.of(context).textTheme.headlineMedium,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const SizedBox(height: 10),
                 Text(
@@ -99,17 +94,9 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                   ).textTheme.bodyLarge?.copyWith(color: AppTheme.primary),
                 ),
                 const SizedBox(height: 22),
-                _ForecastInsightCard(forecast: forecast),
-                const SizedBox(height: 20),
                 _CategorySpendCard(summary: summary),
                 const SizedBox(height: 20),
-                _AnalysisBudgetCard(
-                  originalAmount: originalAmount,
-                  currency: displayCurrency,
-                  originalSymbol: RecordPresenter.symbol(displayCurrency),
-                  usedKrw: summary.totalKrw,
-                  remainingKrw: math.max(0, budget - summary.totalKrw),
-                ),
+                _ForecastInsightCard(forecast: forecast),
               ],
             ),
             HeaderMenuOverlay(
@@ -117,7 +104,6 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
               dimTopOffset: 94,
               onDismiss: () => setState(() => _isMenuOpen = false),
               onTravelTap: () {
-                setState(() => _isMenuOpen = false);
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const TravelListScreen()),
                 );
@@ -132,34 +118,6 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  String _displayCurrency(List<ReceiptRecord> records, Travel? selectedTravel) {
-    for (final record in records) {
-      if (record.currency != 'KRW') {
-        return record.currency;
-      }
-    }
-    if (selectedTravel != null &&
-        selectedTravel.exchangeTargetCurrency.isNotEmpty) {
-      return selectedTravel.exchangeTargetCurrency;
-    }
-    if (selectedTravel != null &&
-        selectedTravel.exchangeSourceCurrency.isNotEmpty) {
-      return selectedTravel.exchangeSourceCurrency;
-    }
-    return records.isEmpty ? 'KRW' : records.first.currency;
-  }
-
-  double _displayOriginalAmount(List<ReceiptRecord> records, String currency) {
-    final matching = records.where((record) => record.currency == currency);
-    return matching.fold<double>(
-      0,
-      (sum, record) =>
-          sum +
-          record.originalAmount +
-          record.originalAmount * (record.tipPct / 100),
     );
   }
 }
@@ -344,143 +302,56 @@ class _CategorySpendCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
       decoration: BoxDecoration(
-        color: const Color(0xFFFBFBFC),
-        borderRadius: BorderRadius.circular(26),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x080F172A),
+            blurRadius: 18,
+            offset: Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('카테고리별 지출', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 18),
+          const SizedBox(height: 20),
           for (final item in summary.items) ...[
             Row(
               children: [
-                Container(
-                  width: 9,
-                  height: 9,
-                  decoration: BoxDecoration(
-                    color: item.color,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     item.label,
-                    style: Theme.of(context).textTheme.bodyLarge,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF667085),
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
                 Text(
                   '${NumberFormat('#,##0').format(item.amount)}원',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(width: 18),
-                SizedBox(
-                  width: 42,
-                  child: Text(
-                    '${item.percent.round()}%',
-                    textAlign: TextAlign.right,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: const Color(0xFF98A2B3),
-                    ),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFF667085),
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ],
             ),
-            if (item != summary.items.last) const SizedBox(height: 14),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _AnalysisBudgetCard extends StatelessWidget {
-  const _AnalysisBudgetCard({
-    required this.originalAmount,
-    required this.currency,
-    required this.originalSymbol,
-    required this.usedKrw,
-    required this.remainingKrw,
-  });
-
-  final double originalAmount;
-  final String currency;
-  final String originalSymbol;
-  final double usedKrw;
-  final double remainingKrw;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(28, 26, 28, 24),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
-          colors: [AppTheme.primary, AppTheme.primaryStrong],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -10,
-            top: -8,
-            child: Icon(
-              Icons.euro_rounded,
-              size: 120,
-              color: Colors.white.withValues(alpha: 0.08),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                minHeight: 6,
+                value: item.ratio.clamp(0.0, 1.0),
+                backgroundColor: const Color(0xFFEAF0FA),
+                valueColor: AlwaysStoppedAnimation<Color>(item.color),
+              ),
             ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '지금까지 사용한 금액',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
-              ),
-              const SizedBox(height: 8),
-              RichText(
-                text: TextSpan(
-                  children: [
-                    TextSpan(
-                      text:
-                          '$originalSymbol${originalAmount.toStringAsFixed(2)}',
-                      style: Theme.of(context).textTheme.headlineLarge
-                          ?.copyWith(fontSize: 42, color: Colors.white),
-                    ),
-                    TextSpan(
-                      text: currency,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.titleMedium?.copyWith(color: Colors.white),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '≈ ${NumberFormat('#,##0').format(usedKrw)}원 KRW',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(color: Colors.white70),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                '잔여예산 ${NumberFormat('#,##0').format(remainingKrw)}원',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyLarge?.copyWith(color: Colors.white),
-              ),
-            ],
-          ),
+            if (item != summary.items.last) const SizedBox(height: 17),
+          ],
         ],
       ),
     );

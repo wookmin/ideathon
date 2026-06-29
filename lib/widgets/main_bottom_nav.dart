@@ -15,16 +15,16 @@ class MainBottomNav extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Container(
-        height: 74,
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
+        height: 72,
+        padding: const EdgeInsets.fromLTRB(28, 7, 28, 9),
         decoration: const BoxDecoration(
           color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFF1F4FA))),
+          border: Border(top: BorderSide(color: Color(0xFFF4F7FC))),
           boxShadow: [
             BoxShadow(
-              color: Color(0x080F172A),
-              blurRadius: 18,
-              offset: Offset(0, -6),
+              color: Color(0x050F172A),
+              blurRadius: 16,
+              offset: Offset(0, -4),
             ),
           ],
         ),
@@ -84,22 +84,24 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppTheme.primary : const Color(0xFFC6D5FA);
+    final iconColor = selected ? AppTheme.primary : const Color(0xFFD3DDF5);
+    final labelColor = selected ? AppTheme.primary : const Color(0xFFBFD0F4);
 
     return InkWell(
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(16),
       onTap: onTap,
       child: SizedBox(
-        width: 86,
+        width: 76,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: selected ? 28 : 26),
-            const SizedBox(height: 4),
+            Icon(icon, color: iconColor, size: selected ? 25 : 23),
+            const SizedBox(height: 3),
             Text(
               label,
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: color,
+                color: labelColor,
+                fontSize: 10,
                 fontWeight: FontWeight.w800,
               ),
             ),

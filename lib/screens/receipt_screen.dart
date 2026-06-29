@@ -16,7 +16,6 @@ import '../services/exchange_service.dart';
 import '../services/gemini_service.dart';
 import '../utils/budget_alert_presenter.dart';
 import '../utils/record_presenter.dart';
-import '../widgets/main_bottom_nav.dart';
 import '../widgets/receipt_item_tile.dart';
 import '../widgets/service_charge_banner.dart';
 import '../widgets/tip_slider_widget.dart';
@@ -74,8 +73,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     final exchangeAsync = ref.watch(exchangeRatesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('분석 결과')),
-      bottomNavigationBar: const MainBottomNav(currentIndex: 1),
+      backgroundColor: const Color(0xFFF8FAFE),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _analysis == null
@@ -109,477 +107,515 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                     : (tipRules[analysis.countryCode] ?? defaultTipRule)
                           .culture;
 
-                return ListView(
-                  padding: AppTheme.screenPadding.copyWith(top: 12, bottom: 32),
-                  children: [
-                    Container(
-                      height: 260,
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface,
-                        borderRadius: BorderRadius.circular(28),
-                        border: Border.all(color: AppTheme.line),
+                return SafeArea(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(24, 12, 24, 30),
+                    children: [
+                      _ReceiptHeader(
+                        onBackTap: () => Navigator.of(context).pop(),
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(28),
-                        child: Image.file(
-                          File(widget.imagePath),
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => const Center(
-                            child: Icon(
-                              Icons.receipt_long_rounded,
-                              size: 72,
-                              color: AppTheme.primary,
-                            ),
-                          ),
+                      const SizedBox(height: 18),
+                      Text(
+                        '스캔 내역 확인',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
                         ),
+                        textAlign: TextAlign.center,
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    if (analysis.isFallback) ...[
-                      _FailureBanner(analysis: analysis),
-                      const SizedBox(height: 16),
-                    ],
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppTheme.primary, AppTheme.primaryStrong],
-                        ),
-                        borderRadius: BorderRadius.circular(28),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.16),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: Text(
-                                  analysis.isFallback ? 'AI 분석 생략' : 'AI 분석 완료',
-                                  style: Theme.of(context).textTheme.labelLarge
-                                      ?.copyWith(color: Colors.white),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 18),
-                          Text(
-                            '${analysis.country} ${analysis.city}'.trim(),
-                            style: Theme.of(context).textTheme.labelLarge
-                                ?.copyWith(color: Colors.white70),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            RecordPresenter.amountWithSymbol(
-                              currency,
-                              analysis.totalAmount,
-                            ),
-                            style: Theme.of(context).textTheme.headlineLarge
-                                ?.copyWith(color: Colors.white),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '₩${NumberFormat('#,##0').format(amountKrw)}',
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(color: Colors.white70),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.all(18),
-                            decoration: BoxDecoration(
-                              color: AppTheme.surface,
-                              borderRadius: BorderRadius.circular(22),
-                              border: Border.all(color: AppTheme.line),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '통화',
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.labelMedium,
-                                ),
-                                const SizedBox(height: 8),
-                                DropdownButtonFormField<String>(
-                                  initialValue: currency,
-                                  dropdownColor: AppTheme.surface,
-                                  items: currencyOptions
-                                      .map(
-                                        (code) => DropdownMenuItem(
-                                          value: code,
-                                          child: Text(code),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: (value) {
-                                    if (value == null) {
-                                      return;
-                                    }
-                                    setState(() => _selectedCurrency = value);
-                                  },
-                                  decoration: const InputDecoration(
-                                    labelText: '통화 수동 변경',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.all(18),
-                            decoration: BoxDecoration(
-                              color: AppTheme.surface,
-                              borderRadius: BorderRadius.circular(22),
-                              border: Border.all(color: AppTheme.line),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '팁 문화',
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.labelMedium,
-                                ),
-                                const SizedBox(height: 10),
-                                _CultureChip(label: tipCulture),
-                                const SizedBox(height: 12),
-                                Text(
-                                  analysis.summary,
-                                  style: Theme.of(context).textTheme.bodyMedium,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface,
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(color: AppTheme.line),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '팁 계산',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              for (final preset in [10.0, 15.0, 20.0])
-                                Expanded(
-                                  child: Padding(
-                                    padding: EdgeInsets.only(
-                                      right: preset == 20 ? 0 : 8,
-                                    ),
-                                    child: _TipPresetButton(
-                                      value: preset,
-                                      selected:
-                                          _tipPct.round() == preset.round(),
-                                      onTap: () =>
-                                          setState(() => _tipPct = preset),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-                          TipSliderWidget(
-                            value: _tipPct,
-                            min: 0,
-                            max: 30,
-                            onChanged: (value) =>
-                                setState(() => _tipPct = value),
-                          ),
-                          if (analysis.hasServiceCharge) ...[
-                            const SizedBox(height: 12),
-                            const ServiceChargeBanner(),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(28),
-                        gradient: const LinearGradient(
-                          colors: [AppTheme.primary, AppTheme.primaryStrong],
-                        ),
-                      ),
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        children: [
-                          Row(
-                            children: [
-                              _SummaryMetric(
-                                label: '팁 금액',
-                                value: RecordPresenter.amountWithSymbol(
-                                  currency,
-                                  tipOriginal,
-                                ),
-                              ),
-                              const Spacer(),
-                              _SummaryMetric(
-                                label: 'KRW 팁',
-                                value:
-                                    '₩${NumberFormat('#,##0').format(tipKrw)}',
-                                alignEnd: true,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 18),
-                          const Divider(color: Colors.white24),
-                          const SizedBox(height: 18),
-                          Row(
-                            children: [
-                              _SummaryMetric(
-                                label: '총 결제 금액',
-                                value: RecordPresenter.amountWithSymbol(
-                                  currency,
-                                  totalWithTipOriginal,
-                                ),
-                                emphasize: true,
-                              ),
-                              const Spacer(),
-                              _SummaryMetric(
-                                label: '1인당 금액(4인)',
-                                value: RecordPresenter.amountWithSymbol(
-                                  currency,
-                                  perPerson,
-                                ),
-                                emphasize: true,
-                                alignEnd: true,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF4F7FF),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppTheme.line),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(
-                            Icons.lightbulb_outline,
-                            color: AppTheme.primary,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              analysis.analysis,
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(color: AppTheme.primaryStrong),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface,
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(color: AppTheme.line),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            analysis.summary,
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 14),
-                          Text(
-                            '₩${NumberFormat('#,##0').format(amountKrw)} / 팁 포함 ₩${NumberFormat('#,##0').format(totalWithTipKrw)}',
-                            style: Theme.of(context).textTheme.bodyLarge,
-                          ),
-                          if (analysis.savingTips.isNotEmpty) ...[
-                            const SizedBox(height: 10),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: analysis.savingTips
-                                  .map((tip) => _SavingTipChip(label: tip))
-                                  .toList(),
-                            ),
-                          ],
-                          const SizedBox(height: 16),
-                          TextField(
-                            maxLines: 3,
-                            onChanged: (value) => _memo = value,
-                            decoration: const InputDecoration(
-                              labelText: '메모',
-                              hintText: '예: 관광지 근처 식당, 현금 결제',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface,
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(color: AppTheme.line),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '품목 비교',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 10),
-                          if (analysis.items.isEmpty)
-                            Text(
-                              '세부 품목을 구조화하지 못했습니다. OCR 원문을 확인해 주세요.',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            )
-                          else
-                            ...analysis.items.map(
-                              (item) => ReceiptItemTile(
-                                name: item.name,
-                                paid: item.paid,
-                                avg: item.avg,
-                                status: item.status,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () async {
-                        final record = ReceiptRecord(
-                          id: const Uuid().v4(),
-                          date: DateTime.now(),
-                          country: analysis.country,
-                          countryCode: analysis.countryCode,
-                          city: analysis.city,
-                          currency: currency,
-                          originalAmount: analysis.totalAmount,
-                          krwAmount: amountKrw,
-                          exchangeRate: rate,
-                          rawOcrText: widget.ocrText,
-                          items: analysis.items
-                              .map(ReceiptItem.fromAnalysis)
-                              .toList(),
-                          verdict: analysis.verdict,
-                          tipPct: _tipPct,
-                          tipKrw: tipKrw,
-                          memo: _memo,
-                          imagePath: widget.imagePath,
-                          analysis: analysis.analysis,
-                        );
-                        final selectedTravel = ref.read(
-                          effectiveTravelProvider,
-                        );
-                        final recordsBeforeSave = scopedRecordsForTravel(
-                          ref.read(ledgerProvider),
-                          selectedTravel,
-                        );
-                        await ref.read(ledgerProvider.notifier).add(record);
-                        if (!context.mounted) {
-                          return;
-                        }
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('가계부에 저장했습니다.')),
-                        );
-                        BudgetAlertPresenter.maybeShowAfterRecordSaved(
-                          context: context,
-                          travel: selectedTravel,
-                          recordsBeforeSave: recordsBeforeSave,
-                          savedRecord: record,
-                        );
-                        Navigator.of(
-                          context,
-                        ).popUntil((route) => route.isFirst);
-                      },
-                      child: const Text('가계부에 저장하기'),
-                    ),
-                    const SizedBox(height: 12),
-                    if (!analysis.isFallback)
+                      const SizedBox(height: 18),
                       Container(
-                        margin: const EdgeInsets.only(bottom: 12),
+                        height: 210,
                         decoration: BoxDecoration(
                           color: AppTheme.surface,
-                          borderRadius: BorderRadius.circular(22),
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x080F172A),
+                              blurRadius: 18,
+                              offset: Offset(0, 10),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(18),
+                          child: Image.file(
+                            File(widget.imagePath),
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => const Center(
+                              child: Icon(
+                                Icons.receipt_long_rounded,
+                                size: 72,
+                                color: AppTheme.primary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      if (analysis.isFallback) ...[
+                        _FailureBanner(analysis: analysis),
+                        const SizedBox(height: 16),
+                      ],
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x080F172A),
+                              blurRadius: 18,
+                              offset: Offset(0, 10),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEAF3FF),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    analysis.isFallback
+                                        ? 'AI 분석 생략'
+                                        : 'AI 분석 완료',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelLarge
+                                        ?.copyWith(color: AppTheme.primary),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 18),
+                            Text(
+                              '${analysis.country} ${analysis.city}'.trim(),
+                              style: Theme.of(context).textTheme.labelLarge
+                                  ?.copyWith(color: const Color(0xFF8F9AAF)),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              RecordPresenter.amountWithSymbol(
+                                currency,
+                                analysis.totalAmount,
+                              ),
+                              style: Theme.of(context).textTheme.headlineLarge
+                                  ?.copyWith(color: AppTheme.textPrimary),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '₩${NumberFormat('#,##0').format(amountKrw)}',
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(color: const Color(0xFF8F9AAF)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.all(18),
+                              decoration: BoxDecoration(
+                                color: AppTheme.surface,
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '통화',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.labelMedium,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  DropdownButtonFormField<String>(
+                                    initialValue: currency,
+                                    isExpanded: true,
+                                    dropdownColor: AppTheme.surface,
+                                    items: currencyOptions
+                                        .map(
+                                          (code) => DropdownMenuItem(
+                                            value: code,
+                                            child: Text(
+                                              code,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        )
+                                        .toList(),
+                                    onChanged: (value) {
+                                      if (value == null) {
+                                        return;
+                                      }
+                                      setState(() => _selectedCurrency = value);
+                                    },
+                                    decoration: const InputDecoration(
+                                      labelText: '통화 수동 변경',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.all(18),
+                              decoration: BoxDecoration(
+                                color: AppTheme.surface,
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '팁 문화',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.labelMedium,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  _CultureChip(label: tipCulture),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    analysis.summary,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surface,
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '팁 계산',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                for (final preset in [10.0, 15.0, 20.0])
+                                  Expanded(
+                                    child: Padding(
+                                      padding: EdgeInsets.only(
+                                        right: preset == 20 ? 0 : 8,
+                                      ),
+                                      child: _TipPresetButton(
+                                        value: preset,
+                                        selected:
+                                            _tipPct.round() == preset.round(),
+                                        onTap: () =>
+                                            setState(() => _tipPct = preset),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            TipSliderWidget(
+                              value: _tipPct,
+                              min: 0,
+                              max: 30,
+                              onChanged: (value) =>
+                                  setState(() => _tipPct = value),
+                            ),
+                            if (analysis.hasServiceCharge) ...[
+                              const SizedBox(height: 12),
+                              const ServiceChargeBanner(),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(18),
+                          color: AppTheme.primary,
+                        ),
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                _SummaryMetric(
+                                  label: '팁 금액',
+                                  value: RecordPresenter.amountWithSymbol(
+                                    currency,
+                                    tipOriginal,
+                                  ),
+                                ),
+                                const Spacer(),
+                                _SummaryMetric(
+                                  label: 'KRW 팁',
+                                  value:
+                                      '₩${NumberFormat('#,##0').format(tipKrw)}',
+                                  alignEnd: true,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 18),
+                            const Divider(color: Colors.white24),
+                            const SizedBox(height: 18),
+                            Row(
+                              children: [
+                                _SummaryMetric(
+                                  label: '총 결제 금액',
+                                  value: RecordPresenter.amountWithSymbol(
+                                    currency,
+                                    totalWithTipOriginal,
+                                  ),
+                                  emphasize: true,
+                                ),
+                                const Spacer(),
+                                _SummaryMetric(
+                                  label: '1인당 금액(4인)',
+                                  value: RecordPresenter.amountWithSymbol(
+                                    currency,
+                                    perPerson,
+                                  ),
+                                  emphasize: true,
+                                  alignEnd: true,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF4F7FF),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              Icons.lightbulb_outline,
+                              color: AppTheme.primary,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                analysis.analysis,
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(color: AppTheme.primaryStrong),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surface,
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              analysis.summary,
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              '₩${NumberFormat('#,##0').format(amountKrw)} / 팁 포함 ₩${NumberFormat('#,##0').format(totalWithTipKrw)}',
+                              style: Theme.of(context).textTheme.bodyLarge,
+                            ),
+                            if (analysis.savingTips.isNotEmpty) ...[
+                              const SizedBox(height: 10),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: analysis.savingTips
+                                    .map((tip) => _SavingTipChip(label: tip))
+                                    .toList(),
+                              ),
+                            ],
+                            const SizedBox(height: 16),
+                            TextField(
+                              maxLines: 3,
+                              onChanged: (value) => _memo = value,
+                              decoration: const InputDecoration(
+                                labelText: '메모',
+                                hintText: '예: 관광지 근처 식당, 현금 결제',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surface,
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '품목 비교',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 10),
+                            if (analysis.items.isEmpty)
+                              Text(
+                                '세부 품목을 구조화하지 못했습니다. OCR 원문을 확인해 주세요.',
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              )
+                            else
+                              ...analysis.items.map(
+                                (item) => ReceiptItemTile(
+                                  name: item.name,
+                                  paid: item.paid,
+                                  avg: item.avg,
+                                  status: item.status,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () async {
+                          final record = ReceiptRecord(
+                            id: const Uuid().v4(),
+                            date: DateTime.now(),
+                            country: analysis.country,
+                            countryCode: analysis.countryCode,
+                            city: analysis.city,
+                            currency: currency,
+                            originalAmount: analysis.totalAmount,
+                            krwAmount: amountKrw,
+                            exchangeRate: rate,
+                            rawOcrText: widget.ocrText,
+                            items: analysis.items
+                                .map(ReceiptItem.fromAnalysis)
+                                .toList(),
+                            verdict: analysis.verdict,
+                            tipPct: _tipPct,
+                            tipKrw: tipKrw,
+                            memo: _memo,
+                            imagePath: widget.imagePath,
+                            analysis: analysis.analysis,
+                          );
+                          final selectedTravel = ref.read(
+                            effectiveTravelProvider,
+                          );
+                          final recordsBeforeSave = scopedRecordsForTravel(
+                            ref.read(ledgerProvider),
+                            selectedTravel,
+                          );
+                          await ref.read(ledgerProvider.notifier).add(record);
+                          if (!context.mounted) {
+                            return;
+                          }
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('가계부에 저장했습니다.')),
+                          );
+                          BudgetAlertPresenter.maybeShowAfterRecordSaved(
+                            context: context,
+                            travel: selectedTravel,
+                            recordsBeforeSave: recordsBeforeSave,
+                            savedRecord: record,
+                          );
+                          Navigator.of(
+                            context,
+                          ).popUntil((route) => route.isFirst);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(54),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('내역 저장하기'),
+                      ),
+                      const SizedBox(height: 12),
+                      if (!analysis.isFallback)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: AppTheme.surface,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: AppTheme.line),
+                          ),
+                          child: ExpansionTile(
+                            title: const Text('바가지 판정 보기 (참고용)'),
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  20,
+                                  0,
+                                  20,
+                                  20,
+                                ),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: VerdictBadge(
+                                    verdict: analysis.verdict,
+                                    label:
+                                        '${analysis.verdictEmoji} ${analysis.verdictLabel}',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppTheme.surface,
+                          borderRadius: BorderRadius.circular(18),
                           border: Border.all(color: AppTheme.line),
                         ),
                         child: ExpansionTile(
-                          title: const Text('바가지 판정 보기 (참고용)'),
+                          title: const Text('OCR 원문 보기'),
+                          childrenPadding: const EdgeInsets.fromLTRB(
+                            20,
+                            0,
+                            20,
+                            20,
+                          ),
                           children: [
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: VerdictBadge(
-                                  verdict: analysis.verdict,
-                                  label:
-                                      '${analysis.verdictEmoji} ${analysis.verdictLabel}',
-                                ),
-                              ),
+                            Text(
+                              widget.ocrText.isEmpty
+                                  ? '추출된 텍스트가 없습니다.'
+                                  : widget.ocrText,
+                              style: Theme.of(context).textTheme.labelSmall,
                             ),
                           ],
                         ),
                       ),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface,
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(color: AppTheme.line),
-                      ),
-                      child: ExpansionTile(
-                        title: const Text('OCR 원문 보기'),
-                        childrenPadding: const EdgeInsets.fromLTRB(
-                          20,
-                          0,
-                          20,
-                          20,
-                        ),
-                        children: [
-                          Text(
-                            widget.ocrText.isEmpty
-                                ? '추출된 텍스트가 없습니다.'
-                                : widget.ocrText,
-                            style: Theme.of(context).textTheme.labelSmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 );
               },
               error: (error, _) =>
@@ -637,6 +673,39 @@ class _FailureBanner extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _ReceiptHeader extends StatelessWidget {
+  const _ReceiptHeader({required this.onBackTap});
+
+  final VoidCallback onBackTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        IconButton(
+          onPressed: onBackTap,
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          color: const Color(0xFF6B7280),
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.white,
+            fixedSize: const Size(42, 42),
+          ),
+        ),
+        const Spacer(),
+        Container(
+          width: 42,
+          height: 42,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.more_horiz_rounded, color: Color(0xFF9AA4B8)),
+        ),
+      ],
     );
   }
 }

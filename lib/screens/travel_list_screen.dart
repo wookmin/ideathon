@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 
 import '../config/theme.dart';
@@ -9,7 +10,9 @@ import '../providers/ledger_provider.dart';
 import '../providers/travel_provider.dart';
 import '../providers/travel_selection_provider.dart';
 import '../utils/record_presenter.dart';
+import '../widgets/header_menu_overlay.dart';
 import 'new_trip_screen.dart';
+import 'settings_screen.dart';
 
 class TravelListScreen extends ConsumerStatefulWidget {
   const TravelListScreen({super.key});
@@ -20,6 +23,7 @@ class TravelListScreen extends ConsumerStatefulWidget {
 
 class _TravelListScreenState extends ConsumerState<TravelListScreen> {
   String _searchQuery = '';
+  bool _isMenuOpen = false;
 
   @override
   Widget build(BuildContext context) {
@@ -36,183 +40,267 @@ class _TravelListScreenState extends ConsumerState<TravelListScreen> {
     }).toList();
 
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        title: const Text('나의 여행 목록'),
-      ),
+      backgroundColor: const Color(0xFFF8FAFE),
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '나의 여행 목록',
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(
-                            fontSize: 24,
-                            color: const Color(0xFF0A1C7A),
+            Column(
+              children: [
+                _TravelListHeader(
+                  isMenuOpen: _isMenuOpen,
+                  onMenuTap: () => setState(() => _isMenuOpen = !_isMenuOpen),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 38, 20, 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '나의 여행 목록',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                fontSize: 16,
+                                color: const Color(0xFF07126C),
+                              ),
+                        ),
+                      ),
+                      SizedBox(
+                        height: 52,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const NewTripScreen(),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.add_rounded, size: 24),
+                          label: const Text('새 여행 추가'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 18),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            textStyle: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
-                    ),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const NewTripScreen(),
                         ),
-                      );
-                    },
-                    icon: const Icon(Icons.add_rounded, size: 28),
-                    label: const Text('새 여행 추가'),
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(0, 76),
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 22, 24, 18),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      onChanged: (value) =>
-                          setState(() => _searchQuery = value),
-                      decoration: const InputDecoration(
-                        hintText: '여행지 검색...',
-                        prefixIcon: Icon(Icons.search_rounded),
-                        fillColor: Color(0xFFF7F7FA),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF7F7FA),
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: IconButton(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('필터 기능은 준비 중입니다.')),
-                        );
-                      },
-                      icon: const Icon(
-                        Icons.tune_rounded,
-                        color: Color(0xFF7B8095),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (selectedTravelId != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 14),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton(
-                    onPressed: () async {
-                      await ref.read(selectedTravelIdProvider.notifier).clear();
-                      if (!context.mounted) {
-                        return;
-                      }
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('자동으로 현재 여행을 다시 선택하도록 변경했어요.'),
-                        ),
-                      );
-                    },
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppTheme.primary,
-                      padding: EdgeInsets.zero,
-                    ),
-                    child: const Text('자동 선택으로 돌아가기'),
+                    ],
                   ),
                 ),
-              ),
-            Expanded(
-              child: filteredTravels.isEmpty
-                  ? const _EmptyTravelState()
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
-                      itemBuilder: (context, index) {
-                        final travel = filteredTravels[index];
-                        final summary = _TravelCardSummary.fromTravel(
-                          travel: travel,
-                          records: records,
-                        );
-                        return _TravelCard(
-                          summary: summary,
-                          isSelected: selectedTravelId == travel.id,
-                          onTap: () async {
-                            await ref
-                                .read(selectedTravelIdProvider.notifier)
-                                .select(travel.id);
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  '${travel.title}을(를) 메인 여행으로 적용했어요.',
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 48,
+                          child: TextField(
+                            onChanged: (value) =>
+                                setState(() => _searchQuery = value),
+                            decoration: InputDecoration(
+                              hintText: '여행지 검색...',
+                              prefixIcon: const Icon(Icons.search_rounded),
+                              fillColor: const Color(0xFFF1EFEF),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 0,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide.none,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide.none,
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(
+                                  color: AppTheme.primary,
                                 ),
                               ),
-                            );
-                          },
-                          onDelete: () async {
-                            final confirmed = await showDialog<bool>(
-                              context: context,
-                              builder: (_) => AlertDialog(
-                                title: const Text('여행 삭제'),
-                                content: Text(
-                                  '\'${travel.title}\'을(를) 삭제할까요?\n이 작업은 되돌릴 수 없어요.',
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.of(context).pop(false),
-                                    child: const Text('취소'),
-                                  ),
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.of(context).pop(true),
-                                    style: TextButton.styleFrom(
-                                      foregroundColor: Colors.red,
-                                    ),
-                                    child: const Text('삭제'),
-                                  ),
-                                ],
-                              ),
-                            );
-                            if (confirmed != true || !context.mounted) return;
-                            await ref
-                                .read(travelProvider.notifier)
-                                .delete(travel.id);
-                            if (!context.mounted) return;
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1EFEF),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: IconButton(
+                          onPressed: () {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('\'${travel.title}\'을(를) 삭제했어요.'),
-                              ),
+                              const SnackBar(content: Text('필터 기능은 준비 중입니다.')),
                             );
                           },
-                        );
-                      },
-                      separatorBuilder: (_, _) => const SizedBox(height: 18),
-                      itemCount: filteredTravels.length,
+                          icon: const Icon(
+                            Icons.filter_list_rounded,
+                            color: Color(0xFF737682),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (selectedTravelId != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 14),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        onPressed: () async {
+                          await ref
+                              .read(selectedTravelIdProvider.notifier)
+                              .clear();
+                          if (!context.mounted) {
+                            return;
+                          }
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('자동으로 현재 여행을 다시 선택하도록 변경했어요.'),
+                            ),
+                          );
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppTheme.primary,
+                          padding: EdgeInsets.zero,
+                        ),
+                        child: const Text('자동 선택으로 돌아가기'),
+                      ),
                     ),
+                  ),
+                Expanded(
+                  child: filteredTravels.isEmpty
+                      ? const _EmptyTravelState()
+                      : ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                          itemBuilder: (context, index) {
+                            final travel = filteredTravels[index];
+                            final summary = _TravelCardSummary.fromTravel(
+                              travel: travel,
+                              records: records,
+                            );
+                            return _TravelCard(
+                              summary: summary,
+                              isSelected: selectedTravelId == travel.id,
+                              onTap: () async {
+                                await ref
+                                    .read(selectedTravelIdProvider.notifier)
+                                    .select(travel.id);
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      '${travel.title}을(를) 메인 여행으로 적용했어요.',
+                                    ),
+                                  ),
+                                );
+                              },
+                              onDelete: () async {
+                                final confirmed = await showDialog<bool>(
+                                  context: context,
+                                  builder: (_) => AlertDialog(
+                                    title: const Text('여행 삭제'),
+                                    content: Text(
+                                      '\'${travel.title}\'을(를) 삭제할까요?\n이 작업은 되돌릴 수 없어요.',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.of(context).pop(false),
+                                        child: const Text('취소'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.of(context).pop(true),
+                                        style: TextButton.styleFrom(
+                                          foregroundColor: Colors.red,
+                                        ),
+                                        child: const Text('삭제'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirmed != true || !context.mounted) {
+                                  return;
+                                }
+                                await ref
+                                    .read(travelProvider.notifier)
+                                    .delete(travel.id);
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      '\'${travel.title}\'을(를) 삭제했어요.',
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                          separatorBuilder: (_, _) =>
+                              const SizedBox(height: 18),
+                          itemCount: filteredTravels.length,
+                        ),
+                ),
+              ],
+            ),
+            HeaderMenuOverlay(
+              isOpen: _isMenuOpen,
+              dimTopOffset: 68,
+              onDismiss: () => setState(() => _isMenuOpen = false),
+              onTravelTap: () => setState(() => _isMenuOpen = false),
+              onSettingsTap: () {
+                setState(() => _isMenuOpen = false);
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                );
+              },
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _TravelListHeader extends StatelessWidget {
+  const _TravelListHeader({required this.isMenuOpen, required this.onMenuTap});
+
+  final bool isMenuOpen;
+  final VoidCallback onMenuTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 68,
+      padding: const EdgeInsets.fromLTRB(20, 0, 28, 0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          SvgPicture.asset('assets/design/icons/headerLogo.svg', width: 40),
+          const Spacer(),
+          HeaderMenuToggleButton(onTap: onMenuTap),
+        ],
       ),
     );
   }
@@ -323,11 +411,16 @@ class _TravelCard extends StatelessWidget {
                               value: 'delete',
                               child: Row(
                                 children: [
-                                  Icon(Icons.delete_outline_rounded,
-                                      color: Colors.red, size: 20),
+                                  Icon(
+                                    Icons.delete_outline_rounded,
+                                    color: Colors.red,
+                                    size: 20,
+                                  ),
                                   SizedBox(width: 8),
-                                  Text('삭제',
-                                      style: TextStyle(color: Colors.red)),
+                                  Text(
+                                    '삭제',
+                                    style: TextStyle(color: Colors.red),
+                                  ),
                                 ],
                               ),
                             ),

@@ -30,8 +30,9 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
-/build/
 /coverage/
+build/
+**/build/
 
 # Symbolication related
 app.*.symbols
@@ -44,19 +45,48 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Claude Code worktrees
-.claude/worktrees/
+# iOS/macOS generated files
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/flutter_export_environment.sh
+ios/Flutter/Generated.xcconfig
+macos/Pods/
+macos/.symlinks/
+macos/Flutter/ephemeral/
 
-# Local API keys
-lib/config/env_local.dart
-windows/flutter/generated_plugins.cmake
-windows/flutter/generated_plugin_registrant.h
-windows/flutter/generated_plugin_registrant.cc
-windows/flutter/generated_plugin_registrant.h
-windows/flutter/generated_plugins.cmake
-pubspec.lock
+# Desktop generated plugin registrants
 linux/flutter/generated_plugin_registrant.cc
 linux/flutter/generated_plugin_registrant.h
 linux/flutter/generated_plugins.cmake
 macos/Flutter/GeneratedPluginRegistrant.swift
 windows/flutter/generated_plugin_registrant.cc
+windows/flutter/generated_plugin_registrant.h
+windows/flutter/generated_plugins.cmake
+
+# Local environment and API keys
+.env
+.env.*
+backend/.env
+backend/.env.*
+!.env.example
+!backend/.env.example
+lib/config/env_local.dart
+ios/Flutter/GoogleMapsKeys.xcconfig
+backend/cloudrun-env.yaml
+backend/*.env.yaml
+backend/*service-account*.json
+backend/*credentials*.json
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+macos/Runner/GoogleService-Info.plist
+
+# Local signing and secrets
+*.jks
+*.keystore
+*.p8
+*.p12
+*.mobileprovision
+
+# Claude Code worktrees
+.claude/settings.local.json
+.claude/worktrees/

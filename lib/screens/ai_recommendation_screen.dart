@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/app_colors.dart';
+import '../models/receipt_record.dart';
 import '../providers/ledger_provider.dart';
 import '../providers/recommendation_provider.dart';
 import '../providers/travel_selection_provider.dart';
@@ -28,8 +29,25 @@ class _AIRecommendationScreenState
     super.initState();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(recommendationProvider).initialize();
+      ref
+          .read(recommendationProvider)
+          .initialize(forecast: _forecast(), records: _scopedRecords());
     });
+  }
+
+  List<ReceiptRecord> _scopedRecords() {
+    final records = ref.read(ledgerProvider);
+    final selectedTravel = ref.read(effectiveTravelProvider);
+    return scopedRecordsForTravel(records, selectedTravel);
+  }
+
+  BudgetForecast _forecast() {
+    final selectedTravel = ref.read(effectiveTravelProvider);
+    final records = _scopedRecords();
+    return const BudgetForecastService().calculate(
+      travel: selectedTravel,
+      records: records,
+    );
   }
 
   @override
@@ -54,7 +72,9 @@ class _AIRecommendationScreenState
                   isLoading: provider.isLoading,
                   message: provider.errorMessage,
                   onRetry: () {
-                    ref.read(recommendationProvider).initialize();
+                    ref
+                        .read(recommendationProvider)
+                        .initialize(forecast: forecast, records: scopedRecords);
                   },
                 ),
                 SafeArea(
@@ -74,127 +94,149 @@ class _AIRecommendationScreenState
                 ),
               ],
             )
-          : Stack(
-              children: [
-                Positioned.fill(
-                  child: RecommendationMapView(
-                    currentPosition: provider.currentPosition!,
-                    places: provider.places,
-                    selectedPlace: provider.selectedPlace,
-                    onMapCreated: provider.onMapCreated,
-                    onPlaceTap: (place) {
-                      provider.selectPlace(place);
-                    },
-                  ),
-                ),
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                const bottomCardHeight = 220.0;
+                const bottomCardGap = 14.0;
+                final hasSelectedPlace = provider.selectedPlace != null;
+                final cardTop =
+                    constraints.maxHeight - bottomCardHeight - bottomCardGap;
+                final currentLocationBottom = hasSelectedPlace
+                    ? bottomCardHeight + 28
+                    : 22.0;
 
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    height: 145,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.92),
-                      border: Border(
-                        bottom: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.35),
-                        ),
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    SizedBox(
+                      width: constraints.maxWidth,
+                      height: constraints.maxHeight,
+                      child: RecommendationMapView(
+                        currentPosition: provider.currentPosition!,
+                        places: provider.places,
+                        selectedPlace: provider.selectedPlace,
+                        onMapCreated: provider.onMapCreated,
+                        onPlaceTap: provider.selectPlace,
                       ),
                     ),
-                  ),
-                ),
 
-                SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 14),
-                    child: Column(
-                      children: [
-                        CategoryChipBar(
-                          selectedCategory: provider.selectedCategory,
-                          onSelected: (category) {
-                            provider.changeCategory(category);
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: _DemoTriggerPanel(
-                            triggers: triggerSource.triggers,
-                            onTrigger: (trigger) => _showDemoAlert(
-                              context,
-                              triggerSource.candidateFor(
-                                trigger: trigger,
-                                forecast: forecast,
-                              ),
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        height: 88,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.96),
+                          border: Border(
+                            bottom: BorderSide(
+                              color: Colors.black.withValues(alpha: 0.04),
                             ),
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
 
-                Positioned(
-                  right: 20,
-                  bottom: provider.selectedPlace != null ? 290 : 30,
-                  child: GestureDetector(
-                    onTap: () {
-                      provider.moveToCurrentLocation();
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 250),
-                      width: 58,
-                      height: 58,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08),
-                            blurRadius: 18,
-                            offset: const Offset(0, 8),
+                    SafeArea(
+                      bottom: false,
+                      child: SizedBox(
+                        height: 54,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: IconButton(
+                            onPressed: () => Navigator.of(context).maybePop(),
+                            icon: const Icon(Icons.chevron_left_rounded),
+                            iconSize: 34,
+                            color: AppColors.textLight,
                           ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.my_location_rounded,
-                        color: AppColors.primary,
+                        ),
                       ),
                     ),
-                  ),
-                ),
 
-                if (provider.selectedPlace != null)
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 280),
-                      child: RecommendationBottomCard(
-                        key: ValueKey(provider.selectedPlace!.id),
-                        place: provider.selectedPlace!,
+                    Positioned(
+                      top: MediaQuery.of(context).padding.top + 92,
+                      left: 0,
+                      right: 0,
+                      child: CategoryChipBar(
+                        selectedCategory: provider.selectedCategory,
+                        onSelected: (category) {
+                          provider.changeCategory(
+                            category,
+                            forecast: forecast,
+                            records: scopedRecords,
+                          );
+                        },
                       ),
                     ),
-                  ),
 
-                if (provider.isLoading)
-                  const Positioned.fill(child: ShimmerMapLoading()),
-
-                if (provider.errorMessage != null && !provider.isLoading)
-                  Positioned(
-                    left: 16,
-                    right: 16,
-                    bottom: provider.selectedPlace != null ? 320 : 30,
-                    child: _InlineErrorCard(
-                      message: provider.errorMessage!,
-                      onRetry: () {
-                        ref.read(recommendationProvider).fetchRecommendations();
-                      },
+                    Positioned(
+                      right: 22,
+                      bottom: currentLocationBottom,
+                      child: GestureDetector(
+                        onTap: provider.moveToCurrentLocation,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.1),
+                                blurRadius: 18,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.my_location_rounded,
+                            color: AppColors.primary,
+                            size: 22,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-              ],
+
+                    if (hasSelectedPlace)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        top: cardTop,
+                        height: bottomCardHeight + bottomCardGap,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 280),
+                          child: RecommendationBottomCard(
+                            key: ValueKey(provider.selectedPlace!.id),
+                            place: provider.selectedPlace!,
+                            onClose: provider.clearSelectedPlace,
+                          ),
+                        ),
+                      ),
+
+                    if (provider.isLoading)
+                      const Positioned.fill(child: ShimmerMapLoading()),
+
+                    if (provider.errorMessage != null && !provider.isLoading)
+                      Positioned(
+                        left: 16,
+                        right: 16,
+                        bottom: hasSelectedPlace ? bottomCardHeight + 44 : 30,
+                        child: _InlineErrorCard(
+                          message: provider.errorMessage!,
+                          onRetry: () {
+                            ref
+                                .read(recommendationProvider)
+                                .fetchRecommendations(
+                                  forecast: forecast,
+                                  records: scopedRecords,
+                                );
+                          },
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
     );
   }

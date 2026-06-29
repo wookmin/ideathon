@@ -2,18 +2,18 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
-import '../config/env.dart';
 import '../models/recommend_category.dart';
 import '../models/recommend_place.dart';
 import '../utils/map_utils.dart';
+import 'backend_base_url_resolver.dart';
 
 class GooglePlacesService {
-  GooglePlacesService(this._dio);
+  GooglePlacesService(this._dio)
+    : _baseUrlResolver = BackendBaseUrlResolver(_dio);
 
   final Dio _dio;
+  final BackendBaseUrlResolver _baseUrlResolver;
   static const _userIdKey = 'financial_api_user_id_v1';
-
-  String get _baseUrl => Env.backendBaseUrl.replaceAll(RegExp(r'/$'), '');
 
   Future<List<RecommendPlace>> fetchNearbyPlaces({
     required double latitude,
@@ -22,9 +22,10 @@ class GooglePlacesService {
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final userId = _getOrCreateUserId(prefs);
+    final baseUrl = await _baseUrlResolver.resolve();
 
     final response = await _dio.get<Map<String, dynamic>>(
-      '$_baseUrl/api/v1/places/nearby',
+      '$baseUrl/api/v1/places/nearby',
       queryParameters: {
         'lat': latitude,
         'lng': longitude,

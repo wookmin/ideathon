@@ -9,8 +9,6 @@ import 'package:permission_handler/permission_handler.dart';
 import '../config/theme.dart';
 import '../services/camera_service.dart';
 import '../services/ocr_service.dart';
-import '../widgets/main_bottom_nav.dart';
-import 'card_sync_screen.dart';
 import 'manual_entry_screen.dart';
 import 'receipt_screen.dart';
 
@@ -44,7 +42,8 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
     if (!mounted) {
       return;
     }
-    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
       unawaited(_disposeCamera());
       return;
     }
@@ -63,9 +62,10 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
 
     try {
       final cameras = await CameraService.getCameras();
-      final selected = cameras.where((camera) {
-        return camera.lensDirection == CameraLensDirection.back;
-      }).firstOrNull ??
+      final selected =
+          cameras.where((camera) {
+            return camera.lensDirection == CameraLensDirection.back;
+          }).firstOrNull ??
           cameras.firstOrNull;
 
       if (selected == null) {
@@ -156,7 +156,10 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
       _statusText = '갤러리 불러오는 중...';
     });
     try {
-      final image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+      final image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
       if (image == null || !mounted) {
         setState(() {
           _statusText = '갤러리 선택을 취소했습니다.';
@@ -183,7 +186,9 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _handleManualCapture() async {
-    if (_cameraController == null || !_cameraController!.value.isInitialized || _busy) {
+    if (_cameraController == null ||
+        !_cameraController!.value.isInitialized ||
+        _busy) {
       if (mounted) {
         setState(() {
           _statusText = '카메라가 아직 준비되지 않았습니다.';
@@ -236,171 +241,144 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final isReady = _cameraController != null && _cameraController!.value.isInitialized;
+    final isReady =
+        _cameraController != null && _cameraController!.value.isInitialized;
 
     return Scaffold(
+      backgroundColor: Colors.black,
       body: SafeArea(
         child: Column(
           children: [
             Padding(
-              padding: AppTheme.screenPadding.copyWith(top: 14, bottom: 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
+              padding: const EdgeInsets.fromLTRB(18, 10, 18, 10),
+              child: Row(
+                children: [
+                  _RoundIconButton(
+                    icon: Icons.arrow_back_ios_new_rounded,
+                    onTap: () => Navigator.of(context).maybePop(),
+                  ),
+                  Expanded(
+                    child: Text(
+                      '영수증 스캔',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  _RoundIconButton(icon: Icons.flash_on_rounded, onTap: () {}),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 28),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary,
+                  borderRadius: BorderRadius.circular(999),
+                ),
                 child: Text(
-                  '영수증 스캔 / 직접 입력',
-                  style: Theme.of(context).textTheme.titleLarge,
+                  _statusText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelLarge?.copyWith(color: Colors.white),
                 ),
               ),
             ),
             Expanded(
               child: Padding(
-                padding: AppTheme.screenPadding.copyWith(top: 4, bottom: 0),
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(32),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF111B6D), Color(0xFF232A7A), Color(0xFF111B6D)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: _RoundIconButton(
-                            icon: Icons.close_rounded,
-                            onTap: () => Navigator.of(context).maybePop(),
-                          ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 22),
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primary,
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            _statusText,
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (_cameraError != null) ...[
-                        const SizedBox(height: 12),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 22),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: _initializeCamera,
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: Colors.white,
-                                    side: const BorderSide(color: Colors.white24),
-                                  ),
-                                  child: const Text('다시 시도'),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: openAppSettings,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.white,
-                                    foregroundColor: AppTheme.primaryStrong,
-                                  ),
-                                  child: const Text('설정 열기'),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 14),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 18),
-                          child: _buildPreview(context, isReady),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(28, 18, 28, 24),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            _BottomAction(
-                              icon: Icons.image_rounded,
-                              label: '갤러리',
-                              onTap: _busy ? null : _handleGalleryPick,
-                            ),
-                            const Spacer(flex: 1),
-                            _BottomAction(
-                              icon: Icons.credit_card_rounded,
-                              label: '카드 불러오기',
-                              onTap: _busy
-                                  ? null
-                                  : () {
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => const CardSyncScreen(),
-                                        ),
-                                      );
-                                    },
-                            ),
-                            const Spacer(flex: 1),
-                            GestureDetector(
-                              onTap: _busy ? null : _handleManualCapture,
-                              child: Container(
-                                width: 92,
-                                height: 92,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white24, width: 4),
-                                ),
-                                child: Center(
-                                  child: Container(
-                                    width: 70,
-                                    height: 70,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: _busy ? Colors.white24 : Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const Spacer(flex: 1),
-                            _BottomAction(
-                              icon: Icons.edit_note_rounded,
-                              label: '직접 입력',
-                              onTap: _busy
-                                  ? null
-                                  : () {
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => const ManualEntryScreen(),
-                                        ),
-                                      );
-                                    },
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                padding: const EdgeInsets.fromLTRB(22, 16, 22, 0),
+                child: _buildPreview(context, isReady),
               ),
             ),
-            const MainBottomNav(currentIndex: 1),
+            if (_cameraError != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 14, 22, 0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _initializeCamera,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Colors.white24),
+                        ),
+                        child: const Text('다시 시도'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: openAppSettings,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: AppTheme.primaryStrong,
+                        ),
+                        child: const Text('설정 열기'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _BottomAction(
+                    icon: Icons.image_rounded,
+                    label: '앨범',
+                    onTap: _busy ? null : _handleGalleryPick,
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: _busy ? null : _handleManualCapture,
+                    child: Container(
+                      width: 84,
+                      height: 84,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white30, width: 4),
+                      ),
+                      child: Center(
+                        child: Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: _busy ? Colors.white24 : Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  _BottomAction(
+                    icon: Icons.edit_note_rounded,
+                    label: '직접 입력',
+                    onTap: _busy
+                        ? null
+                        : () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const ManualEntryScreen(),
+                              ),
+                            );
+                          },
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -415,7 +393,9 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
             padding: const EdgeInsets.all(24),
             child: Text(
               _cameraError!,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.white),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(color: Colors.white),
               textAlign: TextAlign.center,
             ),
           ),
@@ -441,14 +421,12 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
         fit: StackFit.expand,
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(0),
             child: CameraPreview(_cameraController!),
           ),
           Positioned.fill(
             child: IgnorePointer(
-              child: CustomPaint(
-                painter: _GuideFramePainter(),
-              ),
+              child: CustomPaint(painter: _GuideFramePainter()),
             ),
           ),
         ],
@@ -466,22 +444,16 @@ class _PreviewShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: const Color(0xFF19A7FF), width: 3.5),
+        color: const Color(0xFF070707),
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(26),
-        child: child,
-      ),
+      child: ClipRRect(borderRadius: BorderRadius.circular(12), child: child),
     );
   }
 }
 
 class _RoundIconButton extends StatelessWidget {
-  const _RoundIconButton({
-    required this.icon,
-    required this.onTap,
-  });
+  const _RoundIconButton({required this.icon, required this.onTap});
 
   final IconData icon;
   final VoidCallback onTap;
@@ -495,10 +467,10 @@ class _RoundIconButton extends StatelessWidget {
         width: 52,
         height: 52,
         decoration: const BoxDecoration(
-          color: Colors.white24,
+          color: Colors.transparent,
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, color: Colors.white, size: 28),
+        child: Icon(icon, color: Colors.white, size: 24),
       ),
     );
   }
@@ -524,21 +496,21 @@ class _BottomAction extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Ink(
-            width: 58,
-            height: 58,
+            width: 50,
+            height: 50,
             decoration: BoxDecoration(
-              color: Colors.white12,
-              borderRadius: BorderRadius.circular(18),
+              color: Colors.white10,
+              shape: BoxShape.circle,
               border: Border.all(color: Colors.white12),
             ),
             child: Icon(icon, color: Colors.white),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Text(
             label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: Colors.white,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(color: Colors.white),
           ),
         ],
       ),
@@ -549,27 +521,59 @@ class _BottomAction extends StatelessWidget {
 class _GuideFramePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    const cornerLength = 30.0;
-    const strokeWidth = 4.0;
+    const cornerLength = 42.0;
+    const strokeWidth = 3.5;
     final paint = Paint()
-      ..color = Colors.white
+      ..color = AppTheme.primary
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
 
     final rect = Rect.fromLTWH(0, 0, size.width, size.height);
 
-    canvas.drawLine(rect.topLeft, rect.topLeft.translate(cornerLength, 0), paint);
-    canvas.drawLine(rect.topLeft, rect.topLeft.translate(0, cornerLength), paint);
+    canvas.drawLine(
+      rect.topLeft,
+      rect.topLeft.translate(cornerLength, 0),
+      paint,
+    );
+    canvas.drawLine(
+      rect.topLeft,
+      rect.topLeft.translate(0, cornerLength),
+      paint,
+    );
 
-    canvas.drawLine(rect.topRight, rect.topRight.translate(-cornerLength, 0), paint);
-    canvas.drawLine(rect.topRight, rect.topRight.translate(0, cornerLength), paint);
+    canvas.drawLine(
+      rect.topRight,
+      rect.topRight.translate(-cornerLength, 0),
+      paint,
+    );
+    canvas.drawLine(
+      rect.topRight,
+      rect.topRight.translate(0, cornerLength),
+      paint,
+    );
 
-    canvas.drawLine(rect.bottomLeft, rect.bottomLeft.translate(cornerLength, 0), paint);
-    canvas.drawLine(rect.bottomLeft, rect.bottomLeft.translate(0, -cornerLength), paint);
+    canvas.drawLine(
+      rect.bottomLeft,
+      rect.bottomLeft.translate(cornerLength, 0),
+      paint,
+    );
+    canvas.drawLine(
+      rect.bottomLeft,
+      rect.bottomLeft.translate(0, -cornerLength),
+      paint,
+    );
 
-    canvas.drawLine(rect.bottomRight, rect.bottomRight.translate(-cornerLength, 0), paint);
-    canvas.drawLine(rect.bottomRight, rect.bottomRight.translate(0, -cornerLength), paint);
+    canvas.drawLine(
+      rect.bottomRight,
+      rect.bottomRight.translate(-cornerLength, 0),
+      paint,
+    );
+    canvas.drawLine(
+      rect.bottomRight,
+      rect.bottomRight.translate(0, -cornerLength),
+      paint,
+    );
   }
 
   @override

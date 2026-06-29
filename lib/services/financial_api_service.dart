@@ -2,24 +2,27 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
-import '../config/env.dart';
 import '../models/card_account.dart';
 import '../models/card_connection.dart';
 import '../models/card_transaction.dart';
+import 'backend_base_url_resolver.dart';
 
 class FinancialApiService {
-  FinancialApiService(this._dio, this._prefs);
+  FinancialApiService(this._dio, this._prefs)
+    : _baseUrlResolver = BackendBaseUrlResolver(_dio);
 
   final Dio _dio;
   final SharedPreferences _prefs;
+  final BackendBaseUrlResolver _baseUrlResolver;
 
   static const _userIdKey = 'financial_api_user_id_v1';
 
-  String get _baseUrl => Env.backendBaseUrl.replaceAll(RegExp(r'/$'), '');
+  Future<String> get _baseUrl => _baseUrlResolver.resolve();
 
   Future<List<CardConnection>> listConnections() async {
+    final baseUrl = await _baseUrl;
     final response = await _request(
-      () => _dio.get<Map<String, dynamic>>('$_baseUrl/api/v1/card/connections'),
+      () => _dio.get<Map<String, dynamic>>('$baseUrl/api/v1/card/connections'),
     );
     final raw = response.data?['connections'] as List<dynamic>? ?? const [];
     return raw
@@ -34,17 +37,15 @@ class FinancialApiService {
     required String loginId,
     required String password,
   }) async {
+    final baseUrl = await _baseUrl;
     final response = await _request(
       () => _dio.post<Map<String, dynamic>>(
-        '$_baseUrl/api/v1/card/connections',
+        '$baseUrl/api/v1/card/connections',
         data: {
           'organization': organization,
           'organizationName': organizationName,
           'loginType': loginType,
-          'credentials': {
-            'id': loginId,
-            'password': password,
-          },
+          'credentials': {'id': loginId, 'password': password},
         },
       ),
     );
@@ -55,8 +56,9 @@ class FinancialApiService {
   }
 
   Future<void> deleteConnection(String connectionId) async {
+    final baseUrl = await _baseUrl;
     await _request(
-      () => _dio.delete<void>('$_baseUrl/api/v1/card/connections/$connectionId'),
+      () => _dio.delete<void>('$baseUrl/api/v1/card/connections/$connectionId'),
     );
   }
 
@@ -65,13 +67,11 @@ class FinancialApiService {
     required String birthDate,
     required String inquiryType,
   }) async {
+    final baseUrl = await _baseUrl;
     final response = await _request(
       () => _dio.get<Map<String, dynamic>>(
-        '$_baseUrl/api/v1/card/connections/$connectionId/cards',
-        queryParameters: {
-          'birthDate': birthDate,
-          'inquiryType': inquiryType,
-        },
+        '$baseUrl/api/v1/card/connections/$connectionId/cards',
+        queryParameters: {'birthDate': birthDate, 'inquiryType': inquiryType},
       ),
     );
     final raw = response.data?['cards'] as List<dynamic>? ?? const [];
@@ -89,16 +89,18 @@ class FinancialApiService {
     required String orderBy,
     String? cardNo,
   }) async {
+    final baseUrl = await _baseUrl;
     final response = await _request(
       () => _dio.post<Map<String, dynamic>>(
-        '$_baseUrl/api/v1/card/connections/$connectionId/sync',
+        '$baseUrl/api/v1/card/connections/$connectionId/sync',
         data: {
           'startDate': startDate,
           'endDate': endDate,
           'birthDate': birthDate,
           'inquiryType': inquiryType,
           'orderBy': orderBy,
-          if (cardNo != null && cardNo.trim().isNotEmpty) 'cardNo': cardNo.trim(),
+          if (cardNo != null && cardNo.trim().isNotEmpty)
+            'cardNo': cardNo.trim(),
         },
       ),
     );
@@ -109,8 +111,9 @@ class FinancialApiService {
   }
 
   Future<List<CardTransaction>> listTransactions() async {
+    final baseUrl = await _baseUrl;
     final response = await _request(
-      () => _dio.get<Map<String, dynamic>>('$_baseUrl/api/v1/transactions'),
+      () => _dio.get<Map<String, dynamic>>('$baseUrl/api/v1/transactions'),
     );
     final raw = response.data?['transactions'] as List<dynamic>? ?? const [];
     return raw
@@ -118,7 +121,9 @@ class FinancialApiService {
         .toList();
   }
 
-  Future<Response<T>> _request<T>(Future<Response<T>> Function() request) async {
+  Future<Response<T>> _request<T>(
+    Future<Response<T>> Function() request,
+  ) async {
     final userId = await _getOrCreateUserId();
     _dio.options.headers['x-user-id'] = userId;
     try {

@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import '../config/theme.dart';
 import '../models/travel.dart';
 import '../providers/travel_provider.dart';
+import '../widgets/header_menu_overlay.dart';
+import 'settings_screen.dart';
 
 // 나라명(표시용) → 통화 코드
 const _countries = [
@@ -62,6 +65,13 @@ class _NewTripScreenState extends ConsumerState<NewTripScreen> {
   String? _selectedCountry;
   String _targetCurrency = 'USD';
   bool _saving = false;
+  bool _isMenuOpen = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _budgetController.addListener(() => setState(() {}));
+  }
 
   @override
   void dispose() {
@@ -109,9 +119,9 @@ class _NewTripScreenState extends ConsumerState<NewTripScreen> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCountry == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('여행지를 선택해 주세요.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('여행지를 선택해 주세요.')));
       return;
     }
 
@@ -135,9 +145,9 @@ class _NewTripScreenState extends ConsumerState<NewTripScreen> {
       );
       await ref.read(travelProvider.notifier).add(travel);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('새 여행을 저장했습니다.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('새 여행을 저장했습니다.')));
       Navigator.of(context).pop();
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -152,94 +162,267 @@ class _NewTripScreenState extends ConsumerState<NewTripScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final budgetKrw = _parseNumber(_budgetController.text) ?? 0;
+    final travelDays = _endDate.difference(_startDate).inDays + 1;
+    final dailyBudget = travelDays <= 0 ? 0 : budgetKrw / travelDays;
+    final currencyFormatter = NumberFormat('#,##0');
+
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        leading: IconButton(
-          onPressed: () => Navigator.of(context).maybePop(),
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-        ),
-        title: Text(
-          '새 여행 추가',
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            fontSize: 22,
-            color: const Color(0xFF0A1C7A),
-          ),
-        ),
-      ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+      backgroundColor: const Color(0xFFF8FAFE),
+      body: SafeArea(
+        child: Stack(
           children: [
-            _SectionLabel(label: '여행 이름'),
-            const SizedBox(height: 12),
-            _InputField(
-              controller: _titleController,
-              hintText: '파리 감성 여행',
-              icon: Icons.edit_outlined,
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? '여행 이름을 입력해 주세요.' : null,
-            ),
-            const SizedBox(height: 26),
-            _SectionLabel(label: '여행지'),
-            const SizedBox(height: 12),
-            _CountryField(
-              selected: _selectedCountry,
-              currency: _selectedCountry != null ? _targetCurrency : null,
-              onTap: _pickCountry,
-            ),
-            const SizedBox(height: 26),
-            _SectionLabel(label: '여행 일정'),
-            const SizedBox(height: 12),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Flexible(
-                  child: _DateField(
-                    value: _formatter.format(_startDate),
-                    onTap: () => _pickDate(isStart: true),
+            Form(
+              key: _formKey,
+              child: ListView(
+                padding: const EdgeInsets.only(bottom: 118),
+                children: [
+                  _NewTripHeader(
+                    onMenuTap: () => setState(() => _isMenuOpen = !_isMenuOpen),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Text('-', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: _DateField(
-                    value: _formatter.format(_endDate),
-                    onTap: () => _pickDate(isStart: false),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 38, 20, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '새 여행 추가',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                fontSize: 16,
+                                color: const Color(0xFF07126C),
+                              ),
+                        ),
+                        const SizedBox(height: 34),
+                        _SectionLabel(label: '여행 이름'),
+                        const SizedBox(height: 10),
+                        _InputField(
+                          controller: _titleController,
+                          hintText: '파리 감성 여행',
+                          icon: Icons.edit_outlined,
+                          validator: (v) => (v == null || v.trim().isEmpty)
+                              ? '여행 이름을 입력해 주세요.'
+                              : null,
+                        ),
+                        const SizedBox(height: 26),
+                        _SectionLabel(label: '여행지'),
+                        const SizedBox(height: 10),
+                        _CountryField(
+                          selected: _selectedCountry,
+                          currency: _selectedCountry != null
+                              ? _targetCurrency
+                              : null,
+                          onTap: _pickCountry,
+                        ),
+                        const SizedBox(height: 26),
+                        _SectionLabel(label: '여행 일정'),
+                        const SizedBox(height: 10),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Flexible(
+                              child: _DateField(
+                                value: _formatter.format(_startDate),
+                                onTap: () => _pickDate(isStart: true),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              '-',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(color: const Color(0xFF8D919E)),
+                            ),
+                            const SizedBox(width: 12),
+                            Flexible(
+                              child: _DateField(
+                                value: _formatter.format(_endDate),
+                                onTap: () => _pickDate(isStart: false),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 34),
+                        _SectionLabel(label: '예산 정하기'),
+                        const SizedBox(height: 10),
+                        _BudgetInputCard(
+                          controller: _budgetController,
+                          totalLabel: '₩${currencyFormatter.format(budgetKrw)}',
+                          dailyLabel:
+                              '하루 예산 ₩${currencyFormatter.format(dailyBudget)}',
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) {
+                              return '총예산을 입력해 주세요.';
+                            }
+                            return _parseNumber(v) == null
+                                ? '숫자 형식으로 입력해 주세요.'
+                                : null;
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-            const SizedBox(height: 26),
-            _SectionLabel(label: '총예산'),
-            const SizedBox(height: 12),
-            _InputField(
-              controller: _budgetController,
-              hintText: '총예산을 입력하세요 (KRW)',
-              icon: Icons.account_balance_wallet_outlined,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return '총예산을 입력해 주세요.';
-                return _parseNumber(v) == null ? '숫자 형식으로 입력해 주세요.' : null;
-              },
-            ),
-            const SizedBox(height: 28),
-            ElevatedButton.icon(
-              onPressed: _saving ? null : _save,
-              icon: const Icon(Icons.check_circle_outline_rounded),
-              label: Text(_saving ? '저장 중...' : '저장하기'),
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size.fromHeight(72),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
+            Positioned(
+              left: 20,
+              right: 20,
+              bottom: 18,
+              child: SizedBox(
+                height: 60,
+                child: ElevatedButton(
+                  onPressed: _saving ? null : _save,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 8,
+                    shadowColor: AppTheme.primary.withValues(alpha: 0.24),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Text(
+                    _saving ? '저장 중...' : '저장하기',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 ),
               ),
             ),
+            HeaderMenuOverlay(
+              isOpen: _isMenuOpen,
+              dimTopOffset: 68,
+              onDismiss: () => setState(() => _isMenuOpen = false),
+              onTravelTap: () {
+                setState(() => _isMenuOpen = false);
+                Navigator.of(context).maybePop();
+              },
+              onSettingsTap: () {
+                setState(() => _isMenuOpen = false);
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                );
+              },
+            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _NewTripHeader extends StatelessWidget {
+  const _NewTripHeader({required this.onMenuTap});
+
+  final VoidCallback onMenuTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 68,
+      padding: const EdgeInsets.fromLTRB(20, 0, 28, 0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          SvgPicture.asset('assets/design/icons/headerLogo.svg', width: 40),
+          const Spacer(),
+          HeaderMenuToggleButton(onTap: onMenuTap),
+        ],
+      ),
+    );
+  }
+}
+
+class _BudgetInputCard extends StatelessWidget {
+  const _BudgetInputCard({
+    required this.controller,
+    required this.totalLabel,
+    required this.dailyLabel,
+    required this.validator,
+  });
+
+  final TextEditingController controller;
+  final String totalLabel;
+  final String dailyLabel;
+  final String? Function(String?) validator;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 18),
+      decoration: BoxDecoration(
+        color: AppTheme.primary,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '총 예산',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: controller,
+            validator: validator,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 30,
+              fontWeight: FontWeight.w800,
+            ),
+            decoration: InputDecoration(
+              hintText: totalLabel,
+              hintStyle: const TextStyle(
+                color: Colors.white,
+                fontSize: 30,
+                fontWeight: FontWeight.w800,
+              ),
+              prefixText: controller.text.trim().isEmpty ? null : '₩',
+              prefixStyle: const TextStyle(
+                color: Colors.white,
+                fontSize: 30,
+                fontWeight: FontWeight.w800,
+              ),
+              border: const UnderlineInputBorder(
+                borderSide: BorderSide(color: Color(0x66FFFFFF)),
+              ),
+              enabledBorder: const UnderlineInputBorder(
+                borderSide: BorderSide(color: Color(0x66FFFFFF)),
+              ),
+              focusedBorder: const UnderlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+              ),
+              errorStyle: const TextStyle(color: Colors.white),
+              contentPadding: EdgeInsets.zero,
+              filled: false,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            dailyLabel,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -262,10 +445,10 @@ class _CountryField extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
       child: Ink(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
         decoration: BoxDecoration(
-          color: const Color(0xFFF7F7FA),
-          borderRadius: BorderRadius.circular(18),
+          color: const Color(0xFFF1EFEF),
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
           children: [
@@ -283,9 +466,12 @@ class _CountryField extends StatelessWidget {
             ),
             if (currency != null)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
-                  color: AppTheme.primary.withOpacity(0.1),
+                  color: AppTheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -325,9 +511,7 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
       setState(() {
         _filtered = q.isEmpty
             ? _countries
-            : _countries
-                .where((c) => c.$1.toLowerCase().contains(q))
-                .toList();
+            : _countries.where((c) => c.$1.toLowerCase().contains(q)).toList();
       });
     });
   }
@@ -410,9 +594,9 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       label,
-      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-        color: AppTheme.primary,
-      ),
+      style: Theme.of(
+        context,
+      ).textTheme.titleMedium?.copyWith(fontSize: 15, color: AppTheme.primary),
     );
   }
 }
@@ -423,24 +607,34 @@ class _InputField extends StatelessWidget {
     required this.hintText,
     required this.icon,
     this.validator,
-    this.keyboardType,
   });
 
   final TextEditingController controller;
   final String hintText;
   final IconData icon;
   final String? Function(String?)? validator;
-  final TextInputType? keyboardType;
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
       controller: controller,
       validator: validator,
-      keyboardType: keyboardType,
       decoration: InputDecoration(
         hintText: hintText,
         prefixIcon: Icon(icon, color: const Color(0xFF7B8095)),
+        fillColor: const Color(0xFFF1EFEF),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AppTheme.primary),
+        ),
       ),
     );
   }
@@ -458,10 +652,10 @@ class _DateField extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
       child: Ink(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         decoration: BoxDecoration(
-          color: const Color(0xFFF7F7FA),
-          borderRadius: BorderRadius.circular(18),
+          color: const Color(0xFFF1EFEF),
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
           children: [

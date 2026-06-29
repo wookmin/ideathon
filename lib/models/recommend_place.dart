@@ -48,6 +48,23 @@ class RecommendPlace {
     required this.description,
   });
 
+  RecommendPlace copyWith({String? aiReason}) {
+    return RecommendPlace(
+      id: id,
+      name: name,
+      category: category,
+      position: position,
+      rating: rating,
+      reviewCount: reviewCount,
+      priceLevel: priceLevel,
+      distanceText: distanceText,
+      walkTimeText: walkTimeText,
+      aiReason: aiReason ?? this.aiReason,
+      imageUrl: imageUrl,
+      description: description,
+    );
+  }
+
   factory RecommendPlace.fromGooglePlace({
     required Map<String, dynamic> json,
     required RecommendCategoryType category,

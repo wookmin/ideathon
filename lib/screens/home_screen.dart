@@ -2,11 +2,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 
 import '../config/theme.dart';
 import '../models/receipt_record.dart';
-import '../models/travel.dart';
 import '../providers/ledger_provider.dart';
 import '../providers/travel_selection_provider.dart';
 import '../services/budget_forecast_service.dart';
@@ -43,21 +43,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final totalKrw = RecordPresenter.totalSpend(scopedRecords);
     final budget =
         selectedTravel?.budgetKrw ?? RecordPresenter.budgetGoal(records);
-    final progress = budget <= 0 ? 0.0 : (totalKrw / budget).clamp(0.0, 0.999);
-    final latest = scopedRecords.isEmpty ? null : scopedRecords.first;
-    final displayCurrency = _displayCurrency(scopedRecords, selectedTravel);
-    final originalAmount = _displayOriginalAmount(
-      scopedRecords,
-      displayCurrency,
-    );
-    final originalSymbol = RecordPresenter.symbol(displayCurrency);
+    final progress = budget <= 0 ? 0.0 : (totalKrw / budget).clamp(0.0, 1.0);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8FAFE),
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppTheme.primary,
         foregroundColor: Colors.white,
-        elevation: 8,
+        elevation: 12,
+        shape: const CircleBorder(),
         onPressed: () => _showAddSheet(context),
         child: const Icon(Icons.add_rounded, size: 34),
       ),
@@ -68,9 +62,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 14, 24, 0),
+                  padding: const EdgeInsets.fromLTRB(26, 14, 26, 0),
                   child: _HomeHeader(
-                    title: '멈칫',
                     travelTitle:
                         selectedTravel?.title ??
                         RecordPresenter.travelTitle(records),
@@ -87,20 +80,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
                 Expanded(
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(24, 22, 24, 28),
+                    padding: const EdgeInsets.fromLTRB(24, 14, 24, 96),
                     children: [
-                      _BudgetGauge(progress: progress),
-                      const SizedBox(height: 16),
-                      _ForecastCard(forecast: forecast),
-                      const SizedBox(height: 22),
-                      _BudgetCard(
-                        originalAmount: originalAmount,
-                        originalSymbol: originalSymbol,
-                        currency: displayCurrency,
-                        usedKrw: totalKrw,
-                        remainingKrw: math.max(0, budget - totalKrw),
+                      _TripHeroCard(
+                        travelTitle:
+                            selectedTravel?.title ??
+                            RecordPresenter.travelTitle(records),
+                        period: selectedTravel != null
+                            ? displayPeriodForTravel(selectedTravel)
+                            : RecordPresenter.travelDateRange(records),
+                        forecast: forecast,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const TravelListScreen(),
+                            ),
+                          );
+                        },
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 20),
+                      _BudgetGauge(progress: progress),
+                      const SizedBox(height: 12),
+                      _BudgetSummaryCards(
+                        remainingKrw: math.max(0, budget - totalKrw),
+                        safeBudgetKrw: forecast.safeDailyBudgetKrw,
+                      ),
+                      const SizedBox(height: 30),
                       Row(
                         children: [
                           Text(
@@ -144,15 +149,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             ),
                           ),
                         ),
-                      const SizedBox(height: 24),
-                      if (selectedTravel != null)
-                        _SelectedTravelSummaryCard(
-                          travelTitle: selectedTravel.title,
-                        )
-                      else if (latest != null)
-                        _TravelSummaryCard(record: latest)
-                      else
-                        const _TravelPlaceholderCard(),
                     ],
                   ),
                 ),
@@ -181,39 +177,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  String _displayCurrency(List<ReceiptRecord> records, Travel? selectedTravel) {
-    for (final record in records) {
-      if (record.currency != 'KRW') {
-        return record.currency;
-      }
-    }
-    if (selectedTravel != null &&
-        selectedTravel.exchangeTargetCurrency.isNotEmpty) {
-      return selectedTravel.exchangeTargetCurrency;
-    }
-    return records.isEmpty ? 'KRW' : records.first.currency;
-  }
-
-  double _displayOriginalAmount(List<ReceiptRecord> records, String currency) {
-    final matching = records
-        .where((record) => record.currency == currency)
-        .toList();
-    if (matching.isEmpty) {
-      return 0;
-    }
-    return matching.fold<double>(
-      0,
-      (sum, record) => sum + record.originalAmount + _tipInOriginal(record),
-    );
-  }
-
-  double _tipInOriginal(ReceiptRecord record) {
-    if (record.tipPct <= 0) {
-      return 0;
-    }
-    return record.originalAmount * (record.tipPct / 100);
-  }
-
   void _showAddSheet(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
@@ -239,157 +202,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-class _ForecastCard extends StatelessWidget {
-  const _ForecastCard({required this.forecast});
-
-  final BudgetForecast forecast;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _statusColor(forecast.status);
-    final title = _title;
-    final description = _description;
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: color.withValues(alpha: 0.26)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(Icons.speed_rounded, color: color),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(description, style: Theme.of(context).textTheme.bodyMedium),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _ForecastMetric(
-                  label: '오늘 안전 소비',
-                  value:
-                      '${NumberFormat('#,##0').format(forecast.safeDailyBudgetKrw)}원',
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _ForecastMetric(
-                  label: '남은 일수',
-                  value: '${forecast.remainingDays}일',
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  String get _title {
-    switch (forecast.status) {
-      case ForecastStatus.noTravel:
-        return '여행 예산을 설정하면 소진일을 예측해요';
-      case ForecastStatus.noSpend:
-        return '첫 지출이 들어오면 예측이 시작돼요';
-      case ForecastStatus.safe:
-        return '현재 속도는 예산 안에 있어요';
-      case ForecastStatus.caution:
-        return '소비 속도가 예산보다 조금 빨라요';
-      case ForecastStatus.danger:
-        return '이 속도면 예산이 먼저 소진돼요';
-      case ForecastStatus.depleted:
-        return '여행 예산을 이미 초과했어요';
-    }
-  }
-
-  String get _description {
-    final depletionDate = forecast.projectedDepletionDate;
-    if (forecast.status == ForecastStatus.noTravel) {
-      return '새 여행을 추가하고 총예산을 입력하면 결제 전 멈칫 알림을 만들 수 있어요.';
-    }
-    if (forecast.status == ForecastStatus.noSpend) {
-      return '영수증 스캔이나 직접 입력으로 첫 소비를 저장해 주세요.';
-    }
-    if (forecast.status == ForecastStatus.depleted) {
-      return '남은 예산이 0원입니다. 다음 결제 전에는 절제 알림을 강하게 띄웁니다.';
-    }
-    if (depletionDate != null && forecast.travel != null) {
-      final start = BudgetForecastService.dateOnly(forecast.travel!.startDate);
-      final tripDay = depletionDate.difference(start).inDays + 1;
-      return '하루 평균 ${NumberFormat('#,##0').format(forecast.dailyAverageKrw)}원 속도라면 $tripDay일차에 예산이 소진될 수 있어요.';
-    }
-    return '하루 평균 ${NumberFormat('#,##0').format(forecast.dailyAverageKrw)}원으로 쓰고 있어요.';
-  }
-
-  Color _statusColor(ForecastStatus status) {
-    return switch (status) {
-      ForecastStatus.safe || ForecastStatus.noSpend => AppTheme.ok,
-      ForecastStatus.caution => AppTheme.warn,
-      ForecastStatus.danger || ForecastStatus.depleted => AppTheme.bad,
-      ForecastStatus.noTravel => AppTheme.primary,
-    };
-  }
-}
-
-class _ForecastMetric extends StatelessWidget {
-  const _ForecastMetric({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.76),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: Theme.of(context).textTheme.labelMedium),
-          const SizedBox(height: 6),
-          Text(value, style: Theme.of(context).textTheme.titleMedium),
-        ],
-      ),
-    );
-  }
-}
-
 class _HomeHeader extends StatelessWidget {
   const _HomeHeader({
-    required this.title,
     required this.travelTitle,
     required this.period,
     required this.status,
     required this.onMenuTap,
   });
 
-  final String title;
   final String travelTitle;
   final String period;
   final String status;
@@ -402,18 +222,16 @@ class _HomeHeader extends StatelessWidget {
       children: [
         Row(
           children: [
-            Text(
-              title,
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontSize: 31,
-                color: AppTheme.primary,
-              ),
+            SvgPicture.asset(
+              'assets/design/icons/headerLogo.svg',
+              height: 18,
+              semanticsLabel: '멈칫',
             ),
             const Spacer(),
             HeaderMenuToggleButton(onTap: onMenuTap),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         Row(
           children: [
             Flexible(
@@ -442,6 +260,223 @@ class _HomeHeader extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _TripHeroCard extends StatelessWidget {
+  const _TripHeroCard({
+    required this.travelTitle,
+    required this.period,
+    required this.forecast,
+    required this.onTap,
+  });
+
+  final String travelTitle;
+  final String period;
+  final BudgetForecast forecast;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final dayLabel = _dayLabel;
+    final caption = _caption;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 112),
+          padding: const EdgeInsets.fromLTRB(20, 17, 18, 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0F6DF3), Color(0xFF3D8CFF)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x33156CE8),
+                blurRadius: 20,
+                offset: Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                right: -2,
+                top: 32,
+                child: SvgPicture.asset(
+                  'assets/design/icons/airplane.svg',
+                  width: 104,
+                  height: 91,
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          travelTitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(color: Colors.white70),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        period,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.labelSmall?.copyWith(color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  RichText(
+                    text: TextSpan(
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(color: Colors.white, height: 1.08),
+                      children: [
+                        TextSpan(text: dayLabel),
+                        const TextSpan(text: ' 까지'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          caption,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(color: Colors.white70),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        '예측보기',
+                        style: Theme.of(
+                          context,
+                        ).textTheme.labelLarge?.copyWith(color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String get _dayLabel {
+    if (forecast.travel == null) return '여행 준비';
+    if (forecast.elapsedDays <= 0) return '출발 전';
+    return '${forecast.elapsedDays}일째';
+  }
+
+  String get _caption {
+    if (forecast.travel == null) {
+      return '여행을 추가하고 예산 알림을 시작해요';
+    }
+    if (forecast.remainingDays <= 1) {
+      return '여행 마지막 날까지 예산을 확인해요';
+    }
+    return '여행 종료까지 ${forecast.remainingDays}일이 남았어요';
+  }
+}
+
+class _BudgetSummaryCards extends StatelessWidget {
+  const _BudgetSummaryCards({
+    required this.remainingKrw,
+    required this.safeBudgetKrw,
+  });
+
+  final double remainingKrw;
+  final double safeBudgetKrw;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _BudgetSummaryCard(
+            label: '남은 예산',
+            value: _formatWon(remainingKrw),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _BudgetSummaryCard(
+            label: '적정 예산',
+            value: _formatWon(safeBudgetKrw),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatWon(double value) {
+    return '₩${NumberFormat('#,##0').format(value)}';
+  }
+}
+
+class _BudgetSummaryCard extends StatelessWidget {
+  const _BudgetSummaryCard({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(13),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x080F172A),
+            blurRadius: 16,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: const Color(0xFF97A0B4),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontSize: 14,
+              color: const Color(0xFF111827),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -477,38 +512,46 @@ class _BudgetGauge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 176,
+      height: 214,
       child: Stack(
-        alignment: Alignment.center,
+        alignment: Alignment.topCenter,
         children: [
           Positioned.fill(
             child: CustomPaint(painter: _GaugePainter(progress: progress)),
           ),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                '전체 예산 중',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: const Color(0xFF8D96A8),
+          Positioned(
+            top: 82,
+            child: Column(
+              children: [
+                Text(
+                  '전체 예산 중',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF9AA4B8),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${(progress * 100).round()}%',
-                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                  fontSize: 38,
-                  color: AppTheme.primary,
+                const SizedBox(height: 6),
+                Text(
+                  '${(progress * 100).round()}%',
+                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                    fontSize: 44,
+                    height: 1.0,
+                    color: AppTheme.primary,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '사용했어요',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: const Color(0xFF8D96A8),
+                const SizedBox(height: 6),
+                Text(
+                  '사용했어요',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF9AA4B8),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -523,20 +566,21 @@ class _GaugePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height);
-    final radius = math.min(size.width / 2, size.height) - 14;
+    final strokeWidth = size.width * 0.07;
+    final radius = (size.width - strokeWidth) / 2;
+    final center = Offset(size.width / 2, radius + strokeWidth / 2 + 20);
     const startAngle = math.pi;
     const sweepAngle = math.pi;
     final rect = Rect.fromCircle(center: center, radius: radius);
 
     final backgroundPaint = Paint()
-      ..color = const Color(0xFFF0F1F3)
-      ..strokeWidth = 24
+      ..color = const Color(0xFFF0F2F5)
+      ..strokeWidth = strokeWidth
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
     final progressPaint = Paint()
       ..color = AppTheme.primary
-      ..strokeWidth = 24
+      ..strokeWidth = strokeWidth
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
@@ -556,105 +600,6 @@ class _GaugePainter extends CustomPainter {
   }
 }
 
-class _BudgetCard extends StatelessWidget {
-  const _BudgetCard({
-    required this.originalAmount,
-    required this.originalSymbol,
-    required this.currency,
-    required this.usedKrw,
-    required this.remainingKrw,
-  });
-
-  final double originalAmount;
-  final String originalSymbol;
-  final String currency;
-  final double usedKrw;
-  final double remainingKrw;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(28, 26, 28, 22),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
-          colors: [AppTheme.primary, AppTheme.primaryStrong],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -10,
-            top: -6,
-            child: Icon(
-              _currencyWatermarkIcon(currency),
-              size: 120,
-              color: Colors.white.withValues(alpha: 0.08),
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '지금까지 사용한 금액',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
-              ),
-              const SizedBox(height: 8),
-              RichText(
-                text: TextSpan(
-                  children: [
-                    TextSpan(
-                      text:
-                          '$originalSymbol${originalAmount.toStringAsFixed(2)}',
-                      style: Theme.of(context).textTheme.headlineLarge
-                          ?.copyWith(fontSize: 42, color: Colors.white),
-                    ),
-                    TextSpan(
-                      text: currency,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.titleMedium?.copyWith(color: Colors.white),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '≈ ${NumberFormat('#,##0').format(usedKrw)}원 KRW',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(color: Colors.white70),
-              ),
-              const SizedBox(height: 34),
-              Row(
-                children: [
-                  Text(
-                    '잔여예산',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
-                  ),
-                  const SizedBox(width: 24),
-                  Text(
-                    '${NumberFormat('#,##0').format(remainingKrw)}원',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleMedium?.copyWith(color: Colors.white),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _RecentExpenseTile extends StatelessWidget {
   const _RecentExpenseTile({required this.record, required this.onTap});
 
@@ -664,36 +609,40 @@ class _RecentExpenseTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0xFFFCFCFD),
-      borderRadius: BorderRadius.circular(22),
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(14),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+          padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
           child: Row(
             children: [
               Container(
-                width: 46,
-                height: 46,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
                   color: const Color(0xFFF4F7FB),
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(_categoryIcon(record), color: AppTheme.textPrimary),
+                child: Icon(
+                  _categoryIcon(record),
+                  color: AppTheme.textPrimary,
+                  size: 21,
+                ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 13),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       '- ${RecordPresenter.amountWithSymbol(record.currency, record.originalAmount)}',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.titleLarge?.copyWith(color: AppTheme.primary),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: AppTheme.primary,
+                      ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
                     Text(
                       '${RecordPresenter.title(record)} (${RecordPresenter.locationLabel(record)}) | ${RecordPresenter.category(record)}',
                       maxLines: 1,
@@ -749,174 +698,6 @@ class _EmptyRecentCard extends StatelessWidget {
             onPressed: onTap,
             style: ElevatedButton.styleFrom(minimumSize: const Size(180, 50)),
             child: const Text('상세 내역 추가'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TravelSummaryCard extends StatelessWidget {
-  const _TravelSummaryCard({required this.record});
-
-  final ReceiptRecord record;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F9FC),
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              color: const Color(0xFFDCE8FF),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Center(
-              child: Text(
-                RecordPresenter.flag(record.countryCode),
-                style: const TextStyle(fontSize: 24),
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '최근 여행 메모',
-                  style: Theme.of(context).textTheme.labelMedium,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  RecordPresenter.title(record),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  RecordPresenter.shortDate(record.date),
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SelectedTravelSummaryCard extends StatelessWidget {
-  const _SelectedTravelSummaryCard({required this.travelTitle});
-
-  final String travelTitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F9FC),
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              color: const Color(0xFFDCE8FF),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: const Center(
-              child: Icon(
-                Icons.luggage_rounded,
-                color: AppTheme.primary,
-                size: 28,
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '선택된 여행',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: const Color(0xFF99A1B3),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  travelTitle,
-                  style: Theme.of(context).textTheme.titleLarge,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            '메인 적용 중',
-            style: Theme.of(
-              context,
-            ).textTheme.labelLarge?.copyWith(color: AppTheme.primary),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TravelPlaceholderCard extends StatelessWidget {
-  const _TravelPlaceholderCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F9FC),
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              color: const Color(0xFFDCE8FF),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: const Icon(
-              Icons.travel_explore_rounded,
-              color: AppTheme.primary,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('여행 준비 중', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 4),
-                Text(
-                  '첫 영수증을 추가하면 여행 요약이 여기에 표시됩니다.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ],
-            ),
           ),
         ],
       ),
@@ -1045,27 +826,6 @@ class _ActionCard extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-IconData _currencyWatermarkIcon(String currency) {
-  switch (currency) {
-    case 'USD':
-    case 'CAD':
-    case 'AUD':
-    case 'NZD':
-      return Icons.attach_money_rounded;
-    case 'EUR':
-      return Icons.euro_rounded;
-    case 'GBP':
-      return Icons.currency_pound_rounded;
-    case 'JPY':
-    case 'CNY':
-      return Icons.currency_yen_rounded;
-    case 'KRW':
-      return Icons.monetization_on_outlined;
-    default:
-      return Icons.payments_outlined;
   }
 }
 

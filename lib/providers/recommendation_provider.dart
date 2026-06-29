@@ -6,14 +6,22 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../models/recommend_category.dart';
 import '../models/recommend_place.dart';
+import '../models/receipt_record.dart';
+import '../services/budget_forecast_service.dart';
 import '../services/google_places_service.dart';
+import '../services/recommendation_ranker_service.dart';
 import '../utils/location_service.dart' as loc;
 import 'exchange_provider.dart';
 
 class RecommendationProvider extends ChangeNotifier {
-  RecommendationProvider(this._placesService);
+  RecommendationProvider(this._placesService, this._rankerService);
+
+  static const _fallbackPosition = LatLng(37.5665, 126.9780);
+  static const _locationTimeout = Duration(seconds: 8);
+  static const _recommendationTimeout = Duration(seconds: 12);
 
   final GooglePlacesService _placesService;
+  final RecommendationRankerService _rankerService;
 
   GoogleMapController? mapController;
 
@@ -22,18 +30,19 @@ class RecommendationProvider extends ChangeNotifier {
 
   LatLng? currentPosition;
 
-  RecommendCategory selectedCategory =
-      RecommendCategory.categories.first;
+  RecommendCategory selectedCategory = RecommendCategory.categories.first;
 
   List<RecommendPlace> places = [];
 
   RecommendPlace? selectedPlace;
 
-  final Completer<GoogleMapController>
-      mapCompleter = Completer();
+  final Completer<GoogleMapController> mapCompleter = Completer();
 
   /// 초기 진입
-  Future<void> initialize() async {
+  Future<void> initialize({
+    BudgetForecast? forecast,
+    List<ReceiptRecord> records = const [],
+  }) async {
     try {
       isLoading = true;
       errorMessage = null;
@@ -42,7 +51,7 @@ class RecommendationProvider extends ChangeNotifier {
 
       await _getCurrentLocation();
 
-      await fetchRecommendations();
+      await fetchRecommendations(forecast: forecast, records: records);
     } catch (e) {
       errorMessage = _friendlyMessage(e);
       debugPrint(e.toString());
@@ -55,12 +64,20 @@ class RecommendationProvider extends ChangeNotifier {
 
   /// 현재 위치 가져오기
   Future<void> _getCurrentLocation() async {
-    final (lat, lng) = await loc.getCurrentLatLng();
-    currentPosition = LatLng(lat, lng);
+    try {
+      final (lat, lng) = await loc.getCurrentLatLng().timeout(_locationTimeout);
+      currentPosition = LatLng(lat, lng);
+    } on TimeoutException {
+      currentPosition = _fallbackPosition;
+      errorMessage = '현재 위치 확인이 오래 걸려 서울 시청 기준으로 지도를 먼저 열었어요.';
+    }
   }
 
   /// 추천 불러오기
-  Future<void> fetchRecommendations() async {
+  Future<void> fetchRecommendations({
+    BudgetForecast? forecast,
+    List<ReceiptRecord> records = const [],
+  }) async {
     if (currentPosition == null) return;
 
     isLoading = true;
@@ -69,14 +86,27 @@ class RecommendationProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final result =
-          await _placesService.fetchNearbyPlaces(
-        latitude: currentPosition!.latitude,
-        longitude: currentPosition!.longitude,
-        category: selectedCategory,
-      );
+      final result = await _placesService
+          .fetchNearbyPlaces(
+            latitude: currentPosition!.latitude,
+            longitude: currentPosition!.longitude,
+            category: selectedCategory,
+          )
+          .timeout(_recommendationTimeout);
 
-      places = result;
+      if (forecast != null) {
+        places = _rankerService
+            .rank(
+              places: result,
+              category: selectedCategory,
+              forecast: forecast,
+              records: records,
+            )
+            .map((ranked) => ranked.place.copyWith(aiReason: ranked.aiReason))
+            .toList();
+      } else {
+        places = result;
+      }
 
       if (places.isNotEmpty) {
         selectedPlace = places.first;
@@ -97,21 +127,21 @@ class RecommendationProvider extends ChangeNotifier {
 
   /// 카테고리 변경
   Future<void> changeCategory(
-    RecommendCategory category,
-  ) async {
+    RecommendCategory category, {
+    BudgetForecast? forecast,
+    List<ReceiptRecord> records = const [],
+  }) async {
     selectedCategory = category;
 
     selectedPlace = null;
 
     notifyListeners();
 
-    await fetchRecommendations();
+    await fetchRecommendations(forecast: forecast, records: records);
   }
 
   /// 핀 선택
-  Future<void> selectPlace(
-    RecommendPlace place,
-  ) async {
+  Future<void> selectPlace(RecommendPlace place) async {
     selectedPlace = place;
 
     notifyListeners();
@@ -119,19 +149,17 @@ class RecommendationProvider extends ChangeNotifier {
     await moveCamera(place.position);
   }
 
+  void clearSelectedPlace() {
+    selectedPlace = null;
+    notifyListeners();
+  }
+
   /// 카메라 이동
-  Future<void> moveCamera(
-    LatLng target,
-  ) async {
+  Future<void> moveCamera(LatLng target) async {
     if (mapController == null) return;
 
     await mapController!.animateCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(
-          target: target,
-          zoom: 16,
-        ),
-      ),
+      CameraUpdate.newCameraPosition(CameraPosition(target: target, zoom: 16)),
     );
   }
 
@@ -143,9 +171,7 @@ class RecommendationProvider extends ChangeNotifier {
   }
 
   /// 맵 생성
-  void onMapCreated(
-    GoogleMapController controller,
-  ) {
+  void onMapCreated(GoogleMapController controller) {
     mapController = controller;
 
     if (!mapCompleter.isCompleted) {
@@ -170,9 +196,9 @@ class RecommendationProvider extends ChangeNotifier {
 }
 
 /// Riverpod Provider
-final recommendationProvider =
-    ChangeNotifierProvider<RecommendationProvider>(
+final recommendationProvider = ChangeNotifierProvider<RecommendationProvider>(
   (ref) => RecommendationProvider(
     GooglePlacesService(ref.watch(dioProvider)),
+    const RecommendationRankerService(),
   ),
 );

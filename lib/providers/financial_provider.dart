@@ -6,7 +6,9 @@ import '../models/card_transaction.dart';
 import '../services/financial_api_service.dart';
 import 'exchange_provider.dart';
 
-final financialApiServiceProvider = FutureProvider<FinancialApiService>((ref) async {
+final financialApiServiceProvider = FutureProvider<FinancialApiService>((
+  ref,
+) async {
   final prefs = await ref.watch(sharedPreferencesProvider.future);
   return FinancialApiService(ref.watch(dioProvider), prefs);
 });
@@ -47,13 +49,16 @@ class CardSyncState {
       isSubmitting: isSubmitting ?? this.isSubmitting,
       isSyncing: isSyncing ?? this.isSyncing,
       activeConnectionId: activeConnectionId ?? this.activeConnectionId,
-      statusMessage: clearStatusMessage ? null : (statusMessage ?? this.statusMessage),
+      statusMessage: clearStatusMessage
+          ? null
+          : (statusMessage ?? this.statusMessage),
     );
   }
 }
 
-final cardSyncProvider =
-    AsyncNotifierProvider<CardSyncNotifier, CardSyncState>(CardSyncNotifier.new);
+final cardSyncProvider = AsyncNotifierProvider<CardSyncNotifier, CardSyncState>(
+  CardSyncNotifier.new,
+);
 
 class CardSyncNotifier extends AsyncNotifier<CardSyncState> {
   @override
@@ -69,8 +74,13 @@ class CardSyncNotifier extends AsyncNotifier<CardSyncState> {
   }
 
   Future<void> refresh() async {
-    final current = state.valueOrNull ??
-        const CardSyncState(connections: [], cardsByConnection: {}, transactions: []);
+    final current =
+        state.valueOrNull ??
+        const CardSyncState(
+          connections: [],
+          cardsByConnection: {},
+          transactions: [],
+        );
     state = const AsyncLoading<CardSyncState>().copyWithPrevious(state);
     state = await AsyncValue.guard(() async {
       final service = await ref.read(financialApiServiceProvider.future);
@@ -106,16 +116,13 @@ class CardSyncNotifier extends AsyncNotifier<CardSyncState> {
     );
     state = AsyncData(
       current.copyWith(
-        cardsByConnection: {
-          ...current.cardsByConnection,
-          connectionId: cards,
-        },
+        cardsByConnection: {...current.cardsByConnection, connectionId: cards},
       ),
     );
     return cards;
   }
 
-  Future<void> createConnection({
+  Future<CardConnection> createConnection({
     required String organization,
     required String organizationName,
     required String loginType,
@@ -124,15 +131,12 @@ class CardSyncNotifier extends AsyncNotifier<CardSyncState> {
   }) async {
     final current = _requireState();
     state = AsyncData(
-      current.copyWith(
-        isSubmitting: true,
-        clearStatusMessage: true,
-      ),
+      current.copyWith(isSubmitting: true, clearStatusMessage: true),
     );
 
     try {
       final service = await ref.read(financialApiServiceProvider.future);
-      await service.createConnection(
+      final connection = await service.createConnection(
         organization: organization,
         organizationName: organizationName,
         loginType: loginType,
@@ -141,17 +145,11 @@ class CardSyncNotifier extends AsyncNotifier<CardSyncState> {
       );
       await refresh();
       final refreshed = _requireState();
-      state = AsyncData(
-        refreshed.copyWith(
-          statusMessage: '카드사 연결을 완료했습니다.',
-        ),
-      );
+      state = AsyncData(refreshed.copyWith(statusMessage: '카드사 연결을 완료했습니다.'));
+      return connection;
     } catch (error) {
       state = AsyncData(
-        current.copyWith(
-          isSubmitting: false,
-          activeConnectionId: null,
-        ),
+        current.copyWith(isSubmitting: false, activeConnectionId: null),
       );
       rethrow;
     }
@@ -198,10 +196,7 @@ class CardSyncNotifier extends AsyncNotifier<CardSyncState> {
       );
     } catch (error) {
       state = AsyncData(
-        current.copyWith(
-          isSyncing: false,
-          activeConnectionId: null,
-        ),
+        current.copyWith(isSyncing: false, activeConnectionId: null),
       );
       rethrow;
     }
@@ -225,17 +220,15 @@ class CardSyncNotifier extends AsyncNotifier<CardSyncState> {
       state = AsyncData(
         CardSyncState(
           connections: connections,
-          cardsByConnection: Map.of(current.cardsByConnection)..remove(connectionId),
+          cardsByConnection: Map.of(current.cardsByConnection)
+            ..remove(connectionId),
           transactions: transactions,
           statusMessage: '카드 연결을 해제했습니다.',
         ),
       );
     } catch (error) {
       state = AsyncData(
-        current.copyWith(
-          isSubmitting: false,
-          activeConnectionId: null,
-        ),
+        current.copyWith(isSubmitting: false, activeConnectionId: null),
       );
       rethrow;
     }
@@ -243,6 +236,10 @@ class CardSyncNotifier extends AsyncNotifier<CardSyncState> {
 
   CardSyncState _requireState() {
     return state.valueOrNull ??
-        const CardSyncState(connections: [], cardsByConnection: {}, transactions: []);
+        const CardSyncState(
+          connections: [],
+          cardsByConnection: {},
+          transactions: [],
+        );
   }
 }

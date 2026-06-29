@@ -17,64 +17,51 @@ class CategoryChipBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 52,
+      height: 48,
       child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 22),
         scrollDirection: Axis.horizontal,
         itemCount: RecommendCategory.categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
           final category = RecommendCategory.categories[index];
 
-          final bool isSelected =
-              category.type == selectedCategory.type;
+          final bool isSelected = category.type == selectedCategory.type;
 
           return GestureDetector(
             onTap: () => onSelected(category),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeOut,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 18,
-                vertical: 12,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.primary
-                    : Colors.white,
-                borderRadius: BorderRadius.circular(18),
+                color: isSelected ? AppColors.primary : Colors.white,
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: isSelected
-                      ? AppColors.primary
-                      : AppColors.border,
+                  color: isSelected ? AppColors.primary : AppColors.border,
                 ),
                 boxShadow: [
-                  if (isSelected)
-                    BoxShadow(
-                      color: AppColors.primary.withOpacity(0.18),
-                      blurRadius: 18,
-                      offset: const Offset(0, 8),
-                    ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: isSelected ? 18 : 12,
+                    offset: const Offset(0, 8),
+                  ),
                 ],
               ),
               child: Row(
                 children: [
                   Icon(
                     category.icon,
-                    size: 20,
-                    color: isSelected
-                        ? Colors.white
-                        : AppColors.textPrimary,
+                    size: 18,
+                    color: isSelected ? Colors.white : AppColors.textSecondary,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     category.label,
                     style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: isSelected
-                          ? Colors.white
-                          : AppColors.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: isSelected ? Colors.white : AppColors.textPrimary,
                     ),
                   ),
                 ],
