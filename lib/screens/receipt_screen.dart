@@ -13,6 +13,7 @@ import '../services/exchange_service.dart';
 import '../services/gemini_service.dart';
 import '../utils/budget_alert_presenter.dart';
 import '../utils/record_presenter.dart';
+import '../widgets/app_loading_screen.dart';
 
 class ReceiptScreen extends ConsumerStatefulWidget {
   const ReceiptScreen({
@@ -366,7 +367,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFB),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppLoadingScreen()
           : _analysis == null
           ? const Center(child: Text('분석 결과를 불러오지 못했습니다.'))
           : exchangeAsync.when(
@@ -466,7 +467,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
               },
               error: (error, _) =>
                   Center(child: Text('환율 정보를 불러오지 못했습니다.\n$error')),
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const AppLoadingScreen(),
             ),
     );
   }

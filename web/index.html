@@ -31,8 +31,26 @@
 
   <title>ideathon</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    #landing-loader {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0F6DF3;
+      z-index: 9999;
+    }
+    #landing-loader img {
+      width: 40%;
+      max-width: 220px;
+    }
+  </style>
 </head>
 <body>
+  <div id="landing-loader">
+    <img src="landing-logo.svg" alt="Loading" />
+  </div>
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader
@@ -42,5 +60,13 @@
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
   <script src="flutter_bootstrap.js" async></script>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var loader = document.getElementById('landing-loader');
+      if (loader) {
+        loader.remove();
+      }
+    });
+  </script>
 </body>
 </html>
