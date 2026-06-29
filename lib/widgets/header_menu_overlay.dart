@@ -1,6 +1,118 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../config/theme.dart';
+
+class AppTopHeader extends StatelessWidget {
+  const AppTopHeader({
+    super.key,
+    required this.travelTitle,
+    required this.period,
+    required this.status,
+    required this.onMenuTap,
+    this.onBackTap,
+  });
+
+  static const double menuDimTopOffset = 94;
+
+  final String travelTitle;
+  final String period;
+  final String status;
+  final VoidCallback onMenuTap;
+  final VoidCallback? onBackTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasBackButton = onBackTap != null;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(hasBackButton ? 4 : 26, 14, 26, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (hasBackButton) ...[
+                IconButton(
+                  onPressed: onBackTap,
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                  color: const Color(0xFFC2C7D1),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
+              SvgPicture.asset(
+                'assets/design/icons/headerLogo.svg',
+                height: 18,
+                semanticsLabel: '멈칫',
+              ),
+              const Spacer(),
+              HeaderMenuToggleButton(onTap: onMenuTap),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Padding(
+            padding: EdgeInsets.only(left: hasBackButton ? 22 : 0),
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    travelTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleMedium?.copyWith(color: AppTheme.primary),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    period,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF7C879B),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                _HeaderStatusChip(status: status),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderStatusChip extends StatelessWidget {
+  const _HeaderStatusChip({required this.status});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        status,
+        style: Theme.of(
+          context,
+        ).textTheme.labelSmall?.copyWith(color: AppTheme.primary),
+      ),
+    );
+  }
+}
 
 class HeaderMenuToggleButton extends StatelessWidget {
   const HeaderMenuToggleButton({super.key, required this.onTap});

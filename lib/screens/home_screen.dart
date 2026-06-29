@@ -61,22 +61,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           children: [
             Column(
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(26, 14, 26, 0),
-                  child: _HomeHeader(
-                    travelTitle:
-                        selectedTravel?.title ??
-                        RecordPresenter.travelTitle(records),
-                    period: selectedTravel != null
-                        ? displayPeriodForTravel(selectedTravel)
-                        : RecordPresenter.travelDateRange(records),
-                    status: selectedTravel != null
-                        ? displayStatusForTravel(selectedTravel)
-                        : RecordPresenter.statusLabel(records),
-                    onMenuTap: () {
-                      setState(() => _isMenuOpen = !_isMenuOpen);
-                    },
-                  ),
+                AppTopHeader(
+                  travelTitle:
+                      selectedTravel?.title ??
+                      RecordPresenter.travelTitle(records),
+                  period: selectedTravel != null
+                      ? displayPeriodForTravel(selectedTravel)
+                      : RecordPresenter.travelDateRange(records),
+                  status: selectedTravel != null
+                      ? displayStatusForTravel(selectedTravel)
+                      : RecordPresenter.statusLabel(records),
+                  onMenuTap: () {
+                    setState(() => _isMenuOpen = !_isMenuOpen);
+                  },
                 ),
                 Expanded(
                   child: ListView(
@@ -156,7 +153,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
             HeaderMenuOverlay(
               isOpen: _isMenuOpen,
-              dimTopOffset: 94,
+              dimTopOffset: AppTopHeader.menuDimTopOffset,
               onDismiss: () => setState(() => _isMenuOpen = false),
               onTravelTap: () {
                 setState(() => _isMenuOpen = false);
@@ -198,68 +195,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           },
         );
       },
-    );
-  }
-}
-
-class _HomeHeader extends StatelessWidget {
-  const _HomeHeader({
-    required this.travelTitle,
-    required this.period,
-    required this.status,
-    required this.onMenuTap,
-  });
-
-  final String travelTitle;
-  final String period;
-  final String status;
-  final VoidCallback onMenuTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            SvgPicture.asset(
-              'assets/design/icons/headerLogo.svg',
-              height: 18,
-              semanticsLabel: '멈칫',
-            ),
-            const Spacer(),
-            HeaderMenuToggleButton(onTap: onMenuTap),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Flexible(
-              child: Text(
-                travelTitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(color: AppTheme.primary),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                period,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF7C879B),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            _StatusChip(status: status),
-          ],
-        ),
-      ],
     );
   }
 }
@@ -476,29 +411,6 @@ class _BudgetSummaryCard extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.status});
-
-  final String status;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFDCE8FF),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        status,
-        style: Theme.of(
-          context,
-        ).textTheme.labelLarge?.copyWith(color: AppTheme.primary),
       ),
     );
   }

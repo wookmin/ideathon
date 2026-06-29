@@ -12,45 +12,44 @@ class MainBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Container(
-        height: 72,
-        padding: const EdgeInsets.fromLTRB(28, 7, 28, 9),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFF4F7FC))),
-          boxShadow: [
-            BoxShadow(
-              color: Color(0x050F172A),
-              blurRadius: 16,
-              offset: Offset(0, -4),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _NavItem(
-              icon: Icons.bar_chart_rounded,
-              label: '분석',
-              selected: currentIndex == 0,
-              onTap: () => _openTab(context, 0),
-            ),
-            _NavItem(
-              icon: Icons.home_rounded,
-              label: '홈',
-              selected: currentIndex == 1,
-              onTap: () => _openTab(context, 1),
-            ),
-            _NavItem(
-              icon: Icons.auto_awesome_rounded,
-              label: '추천',
-              selected: currentIndex == 2,
-              onTap: () => _openTab(context, 2),
-            ),
-          ],
-        ),
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+
+    return Container(
+      height: 64 + bottomInset,
+      padding: EdgeInsets.fromLTRB(28, 6, 28, bottomInset + 5),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Color(0xFFF4F7FC))),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x050F172A),
+            blurRadius: 16,
+            offset: Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _NavItem(
+            icon: Icons.bar_chart_rounded,
+            label: '분석',
+            selected: currentIndex == 0,
+            onTap: () => _openTab(context, 0),
+          ),
+          _NavItem(
+            icon: Icons.home_rounded,
+            label: '홈',
+            selected: currentIndex == 1,
+            onTap: () => _openTab(context, 1),
+          ),
+          _NavItem(
+            icon: Icons.auto_awesome_rounded,
+            label: '추천',
+            selected: currentIndex == 2,
+            onTap: () => _openTab(context, 2),
+          ),
+        ],
       ),
     );
   }

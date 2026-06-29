@@ -46,10 +46,18 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
       body: SafeArea(
         child: Stack(
           children: [
-            ListView(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 96),
+            Column(
               children: [
-                _AnalysisHeader(
+                AppTopHeader(
+                  travelTitle:
+                      selectedTravel?.title ??
+                      RecordPresenter.travelTitle(records),
+                  period: selectedTravel != null
+                      ? displayPeriodForTravel(selectedTravel)
+                      : RecordPresenter.travelDateRange(records),
+                  status: selectedTravel != null
+                      ? displayStatusForTravel(selectedTravel)
+                      : RecordPresenter.statusLabel(records),
                   onBackTap: () {
                     Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(builder: (_) => const HomeScreen()),
@@ -60,48 +68,54 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                     setState(() => _isMenuOpen = !_isMenuOpen);
                   },
                 ),
-                const SizedBox(height: 20),
-                Text(
-                  '여행 소비 내역 분석',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(24, 28, 24, 96),
+                    children: [
+                      Text(
+                        '여행 소비 내역 분석',
+                        style: Theme.of(context).textTheme.headlineMedium
+                            ?.copyWith(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        selectedTravel == null
+                            ? '소비 데이터를 자동으로 분석해 여행 중\n지출 흐름을 한눈에 보여드려요'
+                            : '${selectedTravel.title} 기준으로 지출 패턴을 분석해\n예산 흐름을 한눈에 보여드려요',
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: const Color(0xFF98A2B3),
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+                      _AnalysisGauge(summary: summary),
+                      const SizedBox(height: 10),
+                      Text(
+                        'AI 인사이트',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(color: AppTheme.primary),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        summary.insight,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+                      _CategorySpendCard(summary: summary),
+                      const SizedBox(height: 20),
+                      _ForecastInsightCard(forecast: forecast),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 10),
-                Text(
-                  selectedTravel == null
-                      ? '소비 데이터를 자동으로 분석해 여행 중\n지출 흐름을 한눈에 보여드려요'
-                      : '${selectedTravel.title} 기준으로 지출 패턴을 분석해\n예산 흐름을 한눈에 보여드려요',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: const Color(0xFF98A2B3),
-                  ),
-                ),
-                const SizedBox(height: 22),
-                _AnalysisGauge(summary: summary),
-                const SizedBox(height: 10),
-                Text(
-                  'AI 인사이트',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleMedium?.copyWith(color: AppTheme.primary),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  summary.insight,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyLarge?.copyWith(color: AppTheme.primary),
-                ),
-                const SizedBox(height: 22),
-                _CategorySpendCard(summary: summary),
-                const SizedBox(height: 20),
-                _ForecastInsightCard(forecast: forecast),
               ],
             ),
             HeaderMenuOverlay(
               isOpen: _isMenuOpen,
-              dimTopOffset: 94,
+              dimTopOffset: AppTopHeader.menuDimTopOffset,
               onDismiss: () => setState(() => _isMenuOpen = false),
               onTravelTap: () {
                 Navigator.of(context).push(
@@ -171,30 +185,6 @@ class _ForecastInsightCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _AnalysisHeader extends StatelessWidget {
-  const _AnalysisHeader({required this.onBackTap, required this.onMenuTap});
-
-  final VoidCallback onBackTap;
-  final VoidCallback onMenuTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        IconButton(
-          onPressed: onBackTap,
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          color: const Color(0xFFC2C7D1),
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-        ),
-        const Spacer(),
-        HeaderMenuToggleButton(onTap: onMenuTap),
-      ],
     );
   }
 }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 
 import '../config/theme.dart';
@@ -29,6 +28,7 @@ class _TravelListScreenState extends ConsumerState<TravelListScreen> {
   Widget build(BuildContext context) {
     final travels = ref.watch(travelProvider);
     final records = ref.watch(ledgerProvider);
+    final selectedTravel = ref.watch(effectiveTravelProvider);
     final selectedTravelId = ref.watch(selectedTravelIdProvider);
     final filteredTravels = travels.where((travel) {
       if (_searchQuery.trim().isEmpty) {
@@ -46,8 +46,16 @@ class _TravelListScreenState extends ConsumerState<TravelListScreen> {
           children: [
             Column(
               children: [
-                _TravelListHeader(
-                  isMenuOpen: _isMenuOpen,
+                AppTopHeader(
+                  travelTitle:
+                      selectedTravel?.title ??
+                      RecordPresenter.travelTitle(records),
+                  period: selectedTravel != null
+                      ? displayPeriodForTravel(selectedTravel)
+                      : RecordPresenter.travelDateRange(records),
+                  status: selectedTravel != null
+                      ? displayStatusForTravel(selectedTravel)
+                      : RecordPresenter.statusLabel(records),
                   onMenuTap: () => setState(() => _isMenuOpen = !_isMenuOpen),
                 ),
                 Padding(
@@ -257,7 +265,7 @@ class _TravelListScreenState extends ConsumerState<TravelListScreen> {
             ),
             HeaderMenuOverlay(
               isOpen: _isMenuOpen,
-              dimTopOffset: 68,
+              dimTopOffset: AppTopHeader.menuDimTopOffset,
               onDismiss: () => setState(() => _isMenuOpen = false),
               onTravelTap: () => setState(() => _isMenuOpen = false),
               onSettingsTap: () {
@@ -269,38 +277,6 @@ class _TravelListScreenState extends ConsumerState<TravelListScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _TravelListHeader extends StatelessWidget {
-  const _TravelListHeader({required this.isMenuOpen, required this.onMenuTap});
-
-  final bool isMenuOpen;
-  final VoidCallback onMenuTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 68,
-      padding: const EdgeInsets.fromLTRB(20, 0, 28, 0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          SvgPicture.asset('assets/design/icons/headerLogo.svg', width: 40),
-          const Spacer(),
-          HeaderMenuToggleButton(onTap: onMenuTap),
-        ],
       ),
     );
   }
@@ -331,8 +307,8 @@ class _TravelCard extends StatelessWidget {
             color: Colors.white,
             borderRadius: BorderRadius.circular(28),
             border: Border.all(
-              color: isSelected ? AppTheme.primary : Colors.transparent,
-              width: 2,
+              color: isSelected ? AppTheme.primary : const Color(0xFFE9EDF5),
+              width: isSelected ? 2.5 : 1,
             ),
             boxShadow: [
               BoxShadow(
@@ -346,17 +322,8 @@ class _TravelCard extends StatelessWidget {
           ),
           child: Column(
             children: [
-              Container(
-                height: 6,
-                decoration: BoxDecoration(
-                  color: summary.accentColor,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(28),
-                  ),
-                ),
-              ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+                padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
                 child: Column(
                   children: [
                     Row(
