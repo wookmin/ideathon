@@ -393,7 +393,7 @@ class _BudgetSummaryCards extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: _BudgetSummaryCard(
-            label: '적정 예산',
+            label: '하루 적정',
             value: _formatWon(safeBudgetKrw),
           ),
         ),

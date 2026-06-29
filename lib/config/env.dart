@@ -23,19 +23,19 @@ class Env {
   );
 
   static const cloudBackendBaseUrl =
-      'https://tripreceipt-backend-593945546381.asia-northeast3.run.app';
+      'https://tripreceipt-backend-153739872406.asia-northeast3.run.app';
 
-  static const localBackendBaseUrls = [
-    'http://imin-ug-ui-MacBookAir.local:4000',
-    'http://localhost:4000',
-    'http://127.0.0.1:4000',
-  ];
+  // static const localBackendBaseUrls = [
+  //   'http://imin-ug-ui-MacBookAir.local:4000',
+  //   'http://localhost:4000',
+  //   'http://127.0.0.1:4000',
+  // ];
 
   static List<String> get backendBaseUrlCandidates {
     final configured = configuredBackendBaseUrl.trim();
     return [
       if (configured.isNotEmpty) configured,
-      ...localBackendBaseUrls,
+      // ...localBackendBaseUrls,
       cloudBackendBaseUrl,
     ];
   }
