@@ -75,16 +75,25 @@ class MainBottomNav extends StatelessWidget {
 class _TabSlideRoute extends PageRouteBuilder {
   _TabSlideRoute({required Widget page, required bool forward})
     : super(
-        transitionDuration: const Duration(milliseconds: 280),
-        reverseTransitionDuration: const Duration(milliseconds: 280),
+        transitionDuration: const Duration(milliseconds: 320),
+        reverseTransitionDuration: const Duration(milliseconds: 320),
         pageBuilder: (context, animation, secondaryAnimation) => page,
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          final begin = Offset(forward ? 1 : -1, 0);
-          final tween = Tween(
-            begin: begin,
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+          );
+          final offsetTween = Tween(
+            begin: Offset(forward ? 0.06 : -0.06, 0),
             end: Offset.zero,
-          ).chain(CurveTween(curve: Curves.easeOutCubic));
-          return SlideTransition(position: animation.drive(tween), child: child);
+          );
+          return FadeTransition(
+            opacity: curved,
+            child: SlideTransition(
+              position: curved.drive(offsetTween),
+              child: child,
+            ),
+          );
         },
       );
 }
