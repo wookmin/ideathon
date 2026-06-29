@@ -61,10 +61,10 @@ List<ReceiptRecord> scopedRecordsForTravel(
 
   final start = _dateOnly(travel.startDate);
   final endExclusive = _dateOnly(travel.endDate).add(const Duration(days: 1));
-  final country = travel.country.trim().toLowerCase();
+  final country = _normalizeCountry(travel.country);
 
   return records.where((record) {
-    final recordCountry = record.country.trim().toLowerCase();
+    final recordCountry = _normalizeCountry(record.country);
     return recordCountry == country &&
         !record.date.isBefore(start) &&
         record.date.isBefore(endExclusive);
@@ -92,3 +92,8 @@ String displayPeriodForTravel(Travel travel) {
 
 DateTime _dateOnly(DateTime value) =>
     DateTime(value.year, value.month, value.day);
+
+String _normalizeCountry(String value) => value
+    .replaceAll(RegExp(r'[^\p{L}\p{N}]', unicode: true), '')
+    .trim()
+    .toLowerCase();
