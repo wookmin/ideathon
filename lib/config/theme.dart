@@ -30,6 +30,21 @@ class AppTheme {
           TargetPlatform.linux: ZoomPageTransitionsBuilder(),
         },
       ),
+      splashFactory: InkSparkle.splashFactory,
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF1F2533),
+        contentTextStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+        elevation: 6,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      ),
       colorScheme: const ColorScheme.light(
         primary: primary,
         secondary: accent,
