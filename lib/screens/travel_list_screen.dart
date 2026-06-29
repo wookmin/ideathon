@@ -10,6 +10,7 @@ import '../providers/travel_provider.dart';
 import '../providers/travel_selection_provider.dart';
 import '../utils/record_presenter.dart';
 import '../widgets/header_menu_overlay.dart';
+import '../widgets/main_bottom_nav.dart';
 import 'new_trip_screen.dart';
 import 'settings_screen.dart';
 
@@ -41,6 +42,7 @@ class _TravelListScreenState extends ConsumerState<TravelListScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFE),
+      bottomNavigationBar: const MainBottomNav(currentIndex: 1),
       body: SafeArea(
         child: Stack(
           children: [

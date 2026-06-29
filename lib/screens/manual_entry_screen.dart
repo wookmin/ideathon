@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:uuid/uuid.dart';
 
 import '../config/theme.dart';
@@ -10,6 +9,10 @@ import '../providers/travel_selection_provider.dart';
 import '../services/exchange_service.dart';
 import '../models/receipt_record.dart';
 import '../utils/budget_alert_presenter.dart';
+import '../utils/record_presenter.dart';
+import '../widgets/header_menu_overlay.dart';
+import 'settings_screen.dart';
+import 'travel_list_screen.dart';
 
 class ManualEntryScreen extends ConsumerStatefulWidget {
   const ManualEntryScreen({super.key});
@@ -19,24 +22,39 @@ class ManualEntryScreen extends ConsumerStatefulWidget {
 }
 
 class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
+  static const _categories = ['식비', '교통', '쇼핑', '기타'];
+
   final _formKey = GlobalKey<FormState>();
   final _countryController = TextEditingController();
   final _cityController = TextEditingController();
   final _amountController = TextEditingController();
-  final _memoController = TextEditingController();
   final _ocrController = TextEditingController();
 
   String _currency = 'USD';
+  String _category = '식비';
   bool _saving = false;
+  bool _isMenuOpen = false;
+  bool _prefilled = false;
 
   @override
   void dispose() {
     _countryController.dispose();
     _cityController.dispose();
     _amountController.dispose();
-    _memoController.dispose();
     _ocrController.dispose();
     super.dispose();
+  }
+
+  void _prefillFromTravel() {
+    if (_prefilled) {
+      return;
+    }
+    final travel = ref.read(effectiveTravelProvider);
+    if (travel != null) {
+      _countryController.text = _stripFlagEmoji(travel.country);
+      _currency = travel.exchangeTargetCurrency;
+    }
+    _prefilled = true;
   }
 
   Future<void> _save() async {
@@ -94,7 +112,7 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
         verdict: 'unknown',
         tipPct: 0,
         tipKrw: 0,
-        memo: _memoController.text.trim(),
+        memo: _category,
         imagePath: null,
         analysis: '직접 입력으로 저장한 내역입니다.',
       );
@@ -127,25 +145,38 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    _prefillFromTravel();
     final ratesAsync = ref.watch(exchangeRatesProvider);
+    final records = ref.watch(ledgerProvider);
+    final selectedTravel = ref.watch(effectiveTravelProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFE),
       body: SafeArea(
         child: Stack(
           children: [
-            Form(
-              key: _formKey,
-              child: ListView(
-                padding: const EdgeInsets.only(bottom: 118),
-                children: [
-                  _ManualEntryHeader(
-                    onBackTap: () => Navigator.of(context).maybePop(),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 34, 20, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            Column(
+              children: [
+                AppTopHeader(
+                  travelTitle:
+                      selectedTravel?.title ??
+                      RecordPresenter.travelTitle(records),
+                  period: selectedTravel != null
+                      ? displayPeriodForTravel(selectedTravel)
+                      : RecordPresenter.travelDateRange(records),
+                  status: selectedTravel != null
+                      ? displayStatusForTravel(selectedTravel)
+                      : RecordPresenter.statusLabel(records),
+                  onBackTap: () => Navigator.of(context).maybePop(),
+                  onMenuTap: () {
+                    setState(() => _isMenuOpen = !_isMenuOpen);
+                  },
+                ),
+                Expanded(
+                  child: Form(
+                    key: _formKey,
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 118),
                       children: [
                         Text(
                           '직접 입력하기',
@@ -231,13 +262,32 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
                           ],
                         ),
                         const SizedBox(height: 24),
-                        _SectionLabel(label: '메모'),
+                        _SectionLabel(label: '결제 카테고리'),
                         const SizedBox(height: 10),
-                        _ManualInputField(
-                          controller: _memoController,
-                          hintText: '예: 점심, 카페, 교통비',
-                          icon: Icons.edit_outlined,
-                          maxLength: 200,
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _categories
+                              .map(
+                                (item) => ChoiceChip(
+                                  label: Text(item),
+                                  selected: _category == item,
+                                  onSelected: (_) =>
+                                      setState(() => _category = item),
+                                  selectedColor: const Color(0xFFDCE8FF),
+                                  backgroundColor: const Color(0xFFF8F8FA),
+                                  labelStyle: TextStyle(
+                                    color: _category == item
+                                        ? AppTheme.primary
+                                        : const Color(0xFF343946),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  side: const BorderSide(
+                                    color: Color(0xFFD7DAE3),
+                                  ),
+                                ),
+                              )
+                              .toList(),
                         ),
                         const SizedBox(height: 24),
                         _SectionLabel(label: '영수증 원문 메모'),
@@ -254,8 +304,25 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
                       ],
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
+            ),
+            HeaderMenuOverlay(
+              isOpen: _isMenuOpen,
+              dimTopOffset: AppTopHeader.menuDimTopOffset,
+              onDismiss: () => setState(() => _isMenuOpen = false),
+              onTravelTap: () {
+                setState(() => _isMenuOpen = false);
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const TravelListScreen()),
+                );
+              },
+              onSettingsTap: () {
+                setState(() => _isMenuOpen = false);
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                );
+              },
             ),
             Positioned(
               left: 20,
@@ -286,42 +353,6 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _ManualEntryHeader extends StatelessWidget {
-  const _ManualEntryHeader({required this.onBackTap});
-
-  final VoidCallback onBackTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 68,
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          SvgPicture.asset('assets/design/icons/headerLogo.svg', width: 40),
-          const Spacer(),
-          IconButton(
-            onPressed: onBackTap,
-            icon: const Icon(Icons.close_rounded),
-            color: AppTheme.primary,
-            iconSize: 30,
-          ),
-        ],
       ),
     );
   }
@@ -492,6 +523,9 @@ class _ExchangeStatusCard extends StatelessWidget {
     );
   }
 }
+
+String _stripFlagEmoji(String value) =>
+    value.replaceAll(RegExp(r'[^\x00-\x7F가-힣]'), '').trim();
 
 String _inferCountryCode({required String currency, required String country}) {
   final normalizedCountry = country.trim().toLowerCase();
