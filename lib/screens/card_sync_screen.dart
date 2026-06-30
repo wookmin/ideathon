@@ -171,6 +171,7 @@ class _CardSyncScreenState extends ConsumerState<CardSyncScreen> {
   Future<List<CardAccount>> _loadCards(
     CardConnection connection, {
     bool showSnackBar = true,
+    bool forceRefresh = false,
   }) async {
     final birthDate = _birthDateController.text.trim();
     if (!RegExp(r'^\d{8}$').hasMatch(birthDate)) {
@@ -187,6 +188,7 @@ class _CardSyncScreenState extends ConsumerState<CardSyncScreen> {
             connectionId: connection.id,
             birthDate: birthDate,
             inquiryType: _inquiryType,
+            forceRefresh: forceRefresh,
           );
       if (!mounted) {
         return cards;
@@ -340,7 +342,8 @@ class _CardSyncScreenState extends ConsumerState<CardSyncScreen> {
                       isBusy:
                           state.activeConnectionId == connection.id &&
                           (state.isSubmitting || state.isSyncing),
-                      onLoadCards: () => _loadCards(connection),
+                      onLoadCards: () =>
+                          _loadCards(connection, forceRefresh: true),
                       onCardSelected: (value) {
                         setState(() {
                           _selectedCardNos[connection.id] = value;
@@ -805,11 +808,6 @@ class _ConnectionTile extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'organization: ${connection.organization}',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 4),
-          Text(
             connection.lastSyncedAt == null
                 ? '아직 동기화 기록이 없습니다.'
                 : '마지막 동기화 ${RecordPresenter.relativeDate(connection.lastSyncedAt!)}',
@@ -852,7 +850,14 @@ class _ConnectionTile extends StatelessWidget {
               Expanded(
                 child: ElevatedButton(
                   onPressed: isBusy ? null : onSync,
-                  child: Text(isBusy ? '처리 중...' : '승인내역 불러오기'),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      isBusy ? '처리 중...' : '승인내역 불러오기',
+                      maxLines: 1,
+                      softWrap: false,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
