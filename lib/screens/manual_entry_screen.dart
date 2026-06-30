@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -12,6 +12,7 @@ import '../utils/budget_alert_presenter.dart';
 import '../utils/record_presenter.dart';
 import '../widgets/header_menu_overlay.dart';
 import 'after_save_screen.dart';
+import 'notification_list_screen.dart';
 import 'settings_screen.dart';
 import 'travel_list_screen.dart';
 

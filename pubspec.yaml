@@ -26,6 +26,7 @@ dependencies:
   geolocator: ^14.0.2
   provider: ^6.1.5+1
   flutter_svg: ^2.0.17
+  flutter_local_notifications: ^22.0.1
 
 dev_dependencies:
   flutter_test:

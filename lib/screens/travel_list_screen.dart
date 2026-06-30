@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -30,6 +30,13 @@ class _TravelListScreenState extends ConsumerState<TravelListScreen> {
   String _searchQuery = '';
   _TravelFilter _filter = _TravelFilter.all;
   bool _isMenuOpen = false;
+
+  void _openHome() {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      (route) => false,
+    );
+  }
 
   Future<void> _showFilterSheet() async {
     final selected = await showModalBottomSheet<_TravelFilter>(
@@ -125,6 +132,14 @@ class _TravelListScreenState extends ConsumerState<TravelListScreen> {
                       ? displayStatusForTravel(selectedTravel)
                       : RecordPresenter.statusLabel(records),
                   onBackTap: () => Navigator.of(context).maybePop(),
+                  onNotificationTap: () {
+                    setState(() => _isMenuOpen = false);
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationListScreen(),
+                      ),
+                    );
+                  },
                   onMenuTap: () => setState(() => _isMenuOpen = !_isMenuOpen),
                 ),
                 Padding(
@@ -153,7 +168,7 @@ class _TravelListScreenState extends ConsumerState<TravelListScreen> {
                                 );
                             if (!context.mounted) return;
                             if (widget.startupMode && createdTravelId != null) {
-                              _openHome(context);
+                              _openHome();
                             }
                           },
                           icon: const Icon(Icons.add_rounded, size: 24),
@@ -255,7 +270,7 @@ class _TravelListScreenState extends ConsumerState<TravelListScreen> {
                                     .select(travel.id);
                                 if (!context.mounted) return;
                                 if (widget.startupMode) {
-                                  _openHome(context);
+                                  _openHome();
                                   return;
                                 }
                                 Navigator.of(context).pop();

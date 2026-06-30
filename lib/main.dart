@@ -14,6 +14,7 @@ import 'providers/travel_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/travel_list_screen.dart';
 import 'services/camera_service.dart';
+import 'services/local_notification_service.dart';
 import 'services/notification_history_service.dart';
 import 'utils/map_plugin_initializer.dart';
 
@@ -22,6 +23,7 @@ Future<void> main() async {
   initializeMapPlugin();
   await initializeDateFormatting('ko');
   await CameraService.warmUp();
+  await LocalNotificationService.initialize();
 
   await Hive.initFlutter();
   Hive
@@ -103,12 +105,14 @@ class _AppBootstrapScreenState extends State<_AppBootstrapScreen> {
 
     if (cameraStatus.isGranted) {
       await CameraService.warmUp();
+      await LocalNotificationService.initialize();
       return;
     }
 
     final next = await Permission.camera.request();
     if (next.isGranted) {
       await CameraService.warmUp();
+      await LocalNotificationService.initialize();
     }
   }
 

@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:hive_flutter/hive_flutter.dart';
 
+import 'local_notification_service.dart';
+
 const notificationHistoryBoxName = 'notification_history';
 
 class AppNotificationItem {
@@ -66,6 +68,11 @@ class NotificationHistoryService {
       createdAt: now,
     );
     await _box.add(jsonEncode(item.toJson()));
+    await LocalNotificationService.show(
+      id: now.millisecondsSinceEpoch.remainder(1 << 31),
+      title: title,
+      message: message,
+    );
   }
 
   static Future<void> addSampleNotifications() async {
