@@ -101,10 +101,11 @@ class CardSyncNotifier extends AsyncNotifier<CardSyncState> {
     required String connectionId,
     required String birthDate,
     required String inquiryType,
+    bool forceRefresh = false,
   }) async {
     final current = _requireState();
     final cached = current.cardsByConnection[connectionId];
-    if (cached != null && cached.isNotEmpty) {
+    if (!forceRefresh && cached != null && cached.isNotEmpty) {
       return cached;
     }
 
