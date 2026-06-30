@@ -28,7 +28,12 @@ class AppTopHeader extends StatelessWidget {
     final hasBackButton = onBackTap != null;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(hasBackButton ? 4 : 26, 14, 26, 0),
+      padding: EdgeInsets.fromLTRB(
+        hasBackButton ? 4 : 26,
+        hasBackButton ? 4 : 14,
+        26,
+        0,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

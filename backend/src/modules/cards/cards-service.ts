@@ -92,7 +92,12 @@ export class CardsService {
       ? rawData
       : (rawData?.cardList ?? []);
 
-    return items.map((item) => ({
+    const filteredItems = items.filter((item) => {
+      const itemOrganization = item.organization ?? item.organizationCode;
+      return !itemOrganization || itemOrganization === connection.organization;
+    });
+
+    return filteredItems.map((item) => ({
       cardNo: item.resCardNo ?? '',
       cardName: item.cardName ?? '이름 없는 카드',
       organization: item.organization ?? connection.organization,

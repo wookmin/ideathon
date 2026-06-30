@@ -14,7 +14,6 @@ import '../widgets/header_menu_overlay.dart';
 import '../widgets/main_bottom_nav.dart';
 import 'new_trip_screen.dart';
 import 'home_screen.dart';
-import 'notification_list_screen.dart';
 import 'settings_screen.dart';
 
 class TravelListScreen extends ConsumerStatefulWidget {
@@ -31,7 +30,7 @@ class _TravelListScreenState extends ConsumerState<TravelListScreen> {
   _TravelFilter _filter = _TravelFilter.all;
   bool _isMenuOpen = false;
 
-  void _openHome() {
+  void _openHome(BuildContext context) {
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const HomeScreen()),
       (route) => false,

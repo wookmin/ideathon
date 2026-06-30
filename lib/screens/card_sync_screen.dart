@@ -21,6 +21,8 @@ class _CardIssuer {
   final bool isCustom;
 
   String get key => isCustom ? 'custom' : organization;
+
+  String get shortLabel => isCustom ? '직접' : name.replaceAll('카드', '');
 }
 
 const _cardIssuers = [
@@ -40,6 +42,24 @@ const _cardIssuers = [
   _CardIssuer(name: '제주카드', organization: '0321'),
   _CardIssuer(name: '직접 입력', organization: '', isCustom: true),
 ];
+
+const List<Color> _issuerPalette = [
+  Color(0xFF1F2533),
+  Color(0xFF1565D8),
+  Color(0xFF0EA5A4),
+  Color(0xFF7C5CFC),
+  Color(0xFFE8527B),
+  Color(0xFF2E9E6C),
+  Color(0xFFC2410C),
+];
+
+Color _colorForOrganization(String organization) {
+  if (organization.isEmpty) {
+    return AppTheme.textSecondary;
+  }
+  final hash = organization.codeUnits.fold<int>(0, (acc, c) => acc + c);
+  return _issuerPalette[hash % _issuerPalette.length];
+}
 
 class CardSyncScreen extends ConsumerStatefulWidget {
   const CardSyncScreen({super.key});
@@ -100,6 +120,7 @@ class _CardSyncScreenState extends ConsumerState<CardSyncScreen> {
         return;
       }
       _passwordController.clear();
+      Navigator.of(context).maybePop();
       final cards = await _loadCards(connection, showSnackBar: false);
       if (!mounted) {
         return;
@@ -171,6 +192,7 @@ class _CardSyncScreenState extends ConsumerState<CardSyncScreen> {
   Future<List<CardAccount>> _loadCards(
     CardConnection connection, {
     bool showSnackBar = true,
+    bool forceRefresh = false,
   }) async {
     final birthDate = _birthDateController.text.trim();
     if (!RegExp(r'^\d{8}$').hasMatch(birthDate)) {
@@ -187,6 +209,7 @@ class _CardSyncScreenState extends ConsumerState<CardSyncScreen> {
             connectionId: connection.id,
             birthDate: birthDate,
             inquiryType: _inquiryType,
+            forceRefresh: forceRefresh,
           );
       if (!mounted) {
         return cards;
@@ -265,6 +288,67 @@ class _CardSyncScreenState extends ConsumerState<CardSyncScreen> {
     });
   }
 
+  void _applyQuickRange(int days) {
+    setState(() {
+      _endDate = DateTime.now();
+      _startDate = DateTime.now().subtract(Duration(days: days));
+    });
+  }
+
+  void _openConnectSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+          ),
+          child: DraggableScrollableSheet(
+            initialChildSize: 0.92,
+            minChildSize: 0.5,
+            maxChildSize: 0.96,
+            expand: false,
+            builder: (context, scrollController) {
+              return StatefulBuilder(
+                builder: (context, setSheetState) {
+                  return Consumer(
+                    builder: (context, ref, _) {
+                      final isSubmitting = ref.watch(
+                        cardSyncProvider.select(
+                          (value) => value.valueOrNull?.isSubmitting ?? false,
+                        ),
+                      );
+                      return _ConnectSheet(
+                        scrollController: scrollController,
+                        formKey: _formKey,
+                        selectedIssuerKey: _selectedIssuerKey,
+                        issuers: _cardIssuers,
+                        organizationController: _organizationController,
+                        organizationNameController:
+                            _organizationNameController,
+                        loginIdController: _loginIdController,
+                        passwordController: _passwordController,
+                        birthDateController: _birthDateController,
+                        isSubmitting: isSubmitting,
+                        onIssuerChanged: (value) {
+                          setState(() => _selectedIssuerKey = value);
+                          setSheetState(() {});
+                        },
+                        onSubmit: _connect,
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final syncState = ref.watch(cardSyncProvider);
@@ -283,64 +367,51 @@ class _CardSyncScreenState extends ConsumerState<CardSyncScreen> {
         data: (state) => RefreshIndicator(
           onRefresh: () => ref.read(cardSyncProvider.notifier).refresh(),
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
             children: [
-              _HeroPanel(
+              _SummaryHeader(
                 connectionCount: state.connections.length,
                 transactionCount: state.transactions.length,
                 statusMessage: state.statusMessage,
               ),
-              const SizedBox(height: 20),
-              _ConnectionForm(
-                formKey: _formKey,
-                selectedIssuerKey: _selectedIssuerKey,
-                issuers: _cardIssuers,
-                organizationController: _organizationController,
-                organizationNameController: _organizationNameController,
-                loginIdController: _loginIdController,
-                passwordController: _passwordController,
-                birthDateController: _birthDateController,
-                isSubmitting: state.isSubmitting,
-                onIssuerChanged: (value) =>
-                    setState(() => _selectedIssuerKey = value),
-                onSubmit: _connect,
-              ),
-              const SizedBox(height: 20),
-              _SyncRangeCard(
-                startDate: _startDate,
-                endDate: _endDate,
-                inquiryType: _inquiryType,
-                orderBy: _orderBy,
-                showAdvancedOptions: _showAdvancedSyncOptions,
-                onPickStartDate: () => _pickDate(isStart: true),
-                onPickEndDate: () => _pickDate(isStart: false),
-                onInquiryTypeChanged: (value) =>
-                    setState(() => _inquiryType = value),
-                onOrderByChanged: (value) => setState(() => _orderBy = value),
-                onToggleAdvancedOptions: () => setState(
-                  () => _showAdvancedSyncOptions = !_showAdvancedSyncOptions,
-                ),
-              ),
               const SizedBox(height: 24),
-              Text('연결된 카드사', style: Theme.of(context).textTheme.titleLarge),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '연결된 카드사',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: _openConnectSheet,
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('연결하기'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppTheme.primary,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 12),
               if (state.connections.isEmpty)
-                const _EmptyCard(
-                  title: '아직 연결된 카드사가 없습니다.',
-                  description: '카드사를 선택하고 로그인 정보를 입력하면 보유 카드까지 자동으로 불러옵니다.',
-                )
+                _EmptyConnectCard(onTap: _openConnectSheet)
               else
                 ...state.connections.map(
                   (connection) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _ConnectionTile(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: _ConnectionCard(
                       connection: connection,
                       cards: state.cardsByConnection[connection.id] ?? const [],
                       selectedCardNo: _selectedCardNos[connection.id],
                       isBusy:
                           state.activeConnectionId == connection.id &&
                           (state.isSubmitting || state.isSyncing),
-                      onLoadCards: () => _loadCards(connection),
+                      startDate: _startDate,
+                      endDate: _endDate,
+                      onLoadCards: () =>
+                          _loadCards(connection, forceRefresh: true),
                       onCardSelected: (value) {
                         setState(() {
                           _selectedCardNos[connection.id] = value;
@@ -351,7 +422,26 @@ class _CardSyncScreenState extends ConsumerState<CardSyncScreen> {
                     ),
                   ),
                 ),
-              const SizedBox(height: 24),
+              if (state.connections.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                _RangeSelector(
+                  startDate: _startDate,
+                  endDate: _endDate,
+                  inquiryType: _inquiryType,
+                  orderBy: _orderBy,
+                  showAdvancedOptions: _showAdvancedSyncOptions,
+                  onQuickRange: _applyQuickRange,
+                  onPickStartDate: () => _pickDate(isStart: true),
+                  onPickEndDate: () => _pickDate(isStart: false),
+                  onInquiryTypeChanged: (value) =>
+                      setState(() => _inquiryType = value),
+                  onOrderByChanged: (value) => setState(() => _orderBy = value),
+                  onToggleAdvancedOptions: () => setState(
+                    () => _showAdvancedSyncOptions = !_showAdvancedSyncOptions,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 28),
               Text(
                 '최근 불러온 승인내역',
                 style: Theme.of(context).textTheme.titleLarge,
@@ -363,14 +453,27 @@ class _CardSyncScreenState extends ConsumerState<CardSyncScreen> {
                   description: '카드 연결 후 최근 30일 승인내역 동기화를 실행해 보세요.',
                 )
               else
-                ...state.transactions
-                    .take(20)
-                    .map(
-                      (transaction) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _TransactionTile(transaction: transaction),
-                      ),
-                    ),
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: AppTheme.line),
+                  ),
+                  child: Column(
+                    children: state.transactions
+                        .take(20)
+                        .toList()
+                        .asMap()
+                        .entries
+                        .map(
+                          (entry) => _TransactionTile(
+                            transaction: entry.value,
+                            showDivider: entry.key != 0,
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
             ],
           ),
         ),
@@ -409,8 +512,8 @@ class _CardSyncScreenState extends ConsumerState<CardSyncScreen> {
   }
 }
 
-class _HeroPanel extends StatelessWidget {
-  const _HeroPanel({
+class _SummaryHeader extends StatelessWidget {
+  const _SummaryHeader({
     required this.connectionCount,
     required this.transactionCount,
     required this.statusMessage,
@@ -422,81 +525,141 @@ class _HeroPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppTheme.primary, AppTheme.primaryStrong],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(28),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'CODEF 카드 연동',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(color: Colors.white),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '앱에서 직접 카드사 비밀키를 다루지 않고, 백엔드를 통해 승인내역을 가져옵니다.',
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
-          ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              _MetricPill(label: '연결', value: '$connectionCount개'),
-              const SizedBox(width: 10),
-              _MetricPill(label: '거래', value: '$transactionCount건'),
-            ],
-          ),
-          if (statusMessage != null && statusMessage!.trim().isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Text(
-              statusMessage!,
-              style: Theme.of(
-                context,
-              ).textTheme.labelLarge?.copyWith(color: Colors.white),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: _StatBlock(label: '연결된 카드사', value: '$connectionCount'),
+            ),
+            Container(width: 1, height: 36, color: AppTheme.line),
+            const SizedBox(width: 20),
+            Expanded(
+              child: _StatBlock(label: '불러온 거래', value: '$transactionCount'),
             ),
           ],
+        ),
+        if (statusMessage != null && statusMessage!.trim().isNotEmpty) ...[
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceAlt,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.info_outline_rounded,
+                  size: 16,
+                  color: AppTheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    statusMessage!,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: AppTheme.primaryStrong,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
-      ),
+      ],
     );
   }
 }
 
-class _MetricPill extends StatelessWidget {
-  const _MetricPill({required this.label, required this.value});
+class _StatBlock extends StatelessWidget {
+  const _StatBlock({required this.label, required this.value});
 
   final String label;
   final String value;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        '$label $value',
-        style: Theme.of(
-          context,
-        ).textTheme.labelLarge?.copyWith(color: Colors.white),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.labelMedium),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+            fontSize: 28,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EmptyConnectCard extends StatelessWidget {
+  const _EmptyConnectCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceAlt,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: AppTheme.primary.withValues(alpha: 0.25),
+            style: BorderStyle.solid,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.add_card_rounded,
+                color: AppTheme.primary,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '카드사를 연결해 보세요',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '로그인 정보만 입력하면 보유 카드까지 자동으로 불러옵니다.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: AppTheme.primary),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _ConnectionForm extends StatelessWidget {
-  const _ConnectionForm({
+class _ConnectSheet extends StatelessWidget {
+  const _ConnectSheet({
+    required this.scrollController,
     required this.formKey,
     required this.selectedIssuerKey,
     required this.issuers,
@@ -510,6 +673,7 @@ class _ConnectionForm extends StatelessWidget {
     required this.onSubmit,
   });
 
+  final ScrollController scrollController;
   final GlobalKey<FormState> formKey;
   final String selectedIssuerKey;
   final List<_CardIssuer> issuers;
@@ -530,46 +694,97 @@ class _ConnectionForm extends StatelessWidget {
     );
 
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppTheme.line),
+      decoration: const BoxDecoration(
+        color: AppTheme.background,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: Form(
         key: formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: ListView(
+          controller: scrollController,
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
           children: [
-            Text('카드 연결 준비', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.line,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text('카드사 연결', style: Theme.of(context).textTheme.headlineMedium),
+            const SizedBox(height: 6),
             Text(
-              '카드사를 고르고 로그인 정보를 입력하면 보유 카드까지 이어서 확인합니다.',
+              '카드사 ID/PW는 저장하지 않고 연결 요청에만 사용합니다.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              initialValue: selectedIssuer.key,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: '카드사'),
-              items: issuers
-                  .map(
-                    (issuer) => DropdownMenuItem(
-                      value: issuer.key,
-                      child: Text(
-                        issuer.isCustom ? '다른 카드사 직접 입력' : issuer.name,
+            const SizedBox(height: 20),
+            GridView.count(
+              crossAxisCount: 3,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 2.6,
+              children: issuers.map((issuer) {
+                final isSelected = issuer.key == selectedIssuerKey;
+                final color = _colorForOrganization(issuer.organization);
+                return GestureDetector(
+                  onTap: () => onIssuerChanged(issuer.key),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected ? color : Colors.white,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: isSelected ? color : AppTheme.line,
                       ),
                     ),
-                  )
-                  .toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  onIssuerChanged(value);
-                }
-              },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (issuer.isCustom)
+                          Icon(
+                            Icons.edit_rounded,
+                            size: 14,
+                            color: isSelected ? Colors.white : color,
+                          )
+                        else
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: isSelected ? Colors.white : color,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            issuer.isCustom ? '직접 입력' : issuer.name,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            style: Theme.of(context).textTheme.labelLarge
+                                ?.copyWith(
+                                  color: isSelected
+                                      ? Colors.white
+                                      : AppTheme.textPrimary,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
             ),
             if (selectedIssuer.isCustom) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: organizationController,
                 decoration: const InputDecoration(
@@ -588,17 +803,25 @@ class _ConnectionForm extends StatelessWidget {
                 validator: _required,
               ),
             ],
+            const SizedBox(height: 20),
+            Text('로그인 정보', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
             TextFormField(
               controller: loginIdController,
-              decoration: const InputDecoration(labelText: '카드사 로그인 ID'),
+              decoration: const InputDecoration(
+                labelText: '카드사 로그인 ID',
+                prefixIcon: Icon(Icons.person_outline_rounded),
+              ),
               validator: _required,
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: passwordController,
               obscureText: true,
-              decoration: const InputDecoration(labelText: '카드사 비밀번호'),
+              decoration: const InputDecoration(
+                labelText: '카드사 비밀번호',
+                prefixIcon: Icon(Icons.lock_outline_rounded),
+              ),
               validator: _required,
             ),
             const SizedBox(height: 12),
@@ -608,18 +831,14 @@ class _ConnectionForm extends StatelessWidget {
               decoration: const InputDecoration(
                 labelText: '생년월일',
                 hintText: '예: 19950130',
+                prefixIcon: Icon(Icons.cake_outlined),
               ),
               validator: _birthDate,
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 24),
             ElevatedButton(
               onPressed: isSubmitting ? null : onSubmit,
               child: Text(isSubmitting ? '연결 중...' : '안전하게 연결하기'),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              '카드사 ID/PW는 저장하지 않고 연결 요청에만 사용합니다.',
-              style: Theme.of(context).textTheme.labelMedium,
             ),
           ],
         ),
@@ -643,13 +862,14 @@ class _ConnectionForm extends StatelessWidget {
   }
 }
 
-class _SyncRangeCard extends StatelessWidget {
-  const _SyncRangeCard({
+class _RangeSelector extends StatelessWidget {
+  const _RangeSelector({
     required this.startDate,
     required this.endDate,
     required this.inquiryType,
     required this.orderBy,
     required this.showAdvancedOptions,
+    required this.onQuickRange,
     required this.onPickStartDate,
     required this.onPickEndDate,
     required this.onInquiryTypeChanged,
@@ -662,59 +882,105 @@ class _SyncRangeCard extends StatelessWidget {
   final String inquiryType;
   final String orderBy;
   final bool showAdvancedOptions;
+  final ValueChanged<int> onQuickRange;
   final VoidCallback onPickStartDate;
   final VoidCallback onPickEndDate;
   final ValueChanged<String> onInquiryTypeChanged;
   final ValueChanged<String> onOrderByChanged;
   final VoidCallback onToggleAdvancedOptions;
 
+  static const _quickRanges = [7, 30, 90];
+
   @override
   Widget build(BuildContext context) {
-    final formatter = DateFormat('yyyy년 M월 d일', 'ko');
+    final formatter = DateFormat('M.d', 'ko');
+    final currentSpan = endDate.difference(startDate).inDays;
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: AppTheme.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('가져오기 설정', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 6),
-          Text(
-            '기본값은 최근 30일, 최신순입니다.',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
-                child: OutlinedButton(
-                  onPressed: onPickStartDate,
-                  child: Text('시작일 ${formatter.format(startDate)}'),
+                child: Text(
+                  '가져오기 기간',
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: onPickEndDate,
-                  child: Text('종료일 ${formatter.format(endDate)}'),
+              GestureDetector(
+                onTap: onPickStartDate,
+                child: Text(
+                  '${formatter.format(startDate)} ~ ${formatter.format(endDate)}',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: AppTheme.primary,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ..._quickRanges.map((days) {
+                final isActive = currentSpan == days;
+                return ChoiceChip(
+                  label: Text('최근 $days일'),
+                  selected: isActive,
+                  onSelected: (_) => onQuickRange(days),
+                  selectedColor: AppTheme.primary,
+                  backgroundColor: AppTheme.surfaceAlt,
+                  labelStyle: TextStyle(
+                    color: isActive ? Colors.white : AppTheme.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                  side: BorderSide.none,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                );
+              }),
+              ActionChip(
+                label: const Text('직접 설정'),
+                onPressed: onPickEndDate,
+                backgroundColor: AppTheme.surfaceAlt,
+                labelStyle: const TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+                side: BorderSide.none,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
           TextButton.icon(
             onPressed: onToggleAdvancedOptions,
             icon: Icon(
               showAdvancedOptions
                   ? Icons.expand_less_rounded
                   : Icons.tune_rounded,
+              size: 18,
             ),
             label: Text(showAdvancedOptions ? '상세 옵션 닫기' : '상세 옵션'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppTheme.textSecondary,
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(0, 36),
+              alignment: Alignment.centerLeft,
+            ),
           ),
           if (showAdvancedOptions) ...[
             const SizedBox(height: 8),
@@ -747,24 +1013,21 @@ class _SyncRangeCard extends StatelessWidget {
                 }
               },
             ),
-            const SizedBox(height: 12),
           ],
-          Text(
-            '카드가 1개면 자동 선택하고, 여러 개면 아래에서 선택합니다.',
-            style: Theme.of(context).textTheme.labelMedium,
-          ),
         ],
       ),
     );
   }
 }
 
-class _ConnectionTile extends StatelessWidget {
-  const _ConnectionTile({
+class _ConnectionCard extends StatelessWidget {
+  const _ConnectionCard({
     required this.connection,
     required this.cards,
     required this.selectedCardNo,
     required this.isBusy,
+    required this.startDate,
+    required this.endDate,
     required this.onLoadCards,
     required this.onCardSelected,
     required this.onSync,
@@ -775,6 +1038,8 @@ class _ConnectionTile extends StatelessWidget {
   final List<CardAccount> cards;
   final String? selectedCardNo;
   final bool isBusy;
+  final DateTime startDate;
+  final DateTime endDate;
   final VoidCallback onLoadCards;
   final ValueChanged<String> onCardSelected;
   final VoidCallback onSync;
@@ -782,8 +1047,10 @@ class _ConnectionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = _colorForOrganization(connection.organization);
+    final isActive = connection.status == 'ACTIVE';
+
     return Container(
-      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(22),
@@ -792,189 +1059,222 @@ class _ConnectionTile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  connection.organizationName,
-                  style: Theme.of(context).textTheme.titleMedium,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 32,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.credit_card_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                 ),
-              ),
-              _StatusChip(label: connection.status),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'organization: ${connection.organization}',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            connection.lastSyncedAt == null
-                ? '아직 동기화 기록이 없습니다.'
-                : '마지막 동기화 ${RecordPresenter.relativeDate(connection.lastSyncedAt!)}',
-            style: Theme.of(context).textTheme.labelMedium,
-          ),
-          const SizedBox(height: 14),
-          OutlinedButton(
-            onPressed: isBusy ? null : onLoadCards,
-            child: Text(cards.isEmpty ? '보유 카드 조회' : '보유 카드 다시 조회'),
-          ),
-          if (cards.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: selectedCardNo ?? cards.first.cardNo,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: '조회할 카드 선택'),
-              items: cards
-                  .map(
-                    (card) => DropdownMenuItem(
-                      value: card.cardNo,
-                      child: Text(
-                        '${card.cardName} · ${card.cardNo}',
-                        overflow: TextOverflow.ellipsis,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        connection.organizationName,
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
+                      const SizedBox(height: 2),
+                      Text(
+                        connection.lastSyncedAt == null
+                            ? '아직 동기화 기록이 없습니다'
+                            : '마지막 동기화 ${RecordPresenter.relativeDate(connection.lastSyncedAt!)}',
+                        style: Theme.of(context).textTheme.labelMedium,
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isActive
+                        ? AppTheme.ok.withValues(alpha: 0.12)
+                        : AppTheme.warn.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    isActive ? '연결됨' : connection.status,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: isActive ? AppTheme.ok : AppTheme.warn,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                PopupMenuButton<String>(
+                  icon: const Icon(
+                    Icons.more_vert_rounded,
+                    color: AppTheme.textSecondary,
+                  ),
+                  onSelected: (value) {
+                    if (value == 'delete') {
+                      onDelete();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Text('연결 해제'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: AppTheme.line),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (cards.isEmpty)
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: isBusy ? null : onLoadCards,
+                      icon: const Icon(Icons.search_rounded, size: 18),
+                      label: const Text('보유 카드 조회'),
                     ),
                   )
-                  .toList(),
-              onChanged: isBusy
-                  ? null
-                  : (value) {
-                      if (value != null) {
-                        onCardSelected(value);
-                      }
-                    },
+                else ...[
+                  Row(
+                    children: [
+                      Text(
+                        '조회할 카드',
+                        style: Theme.of(context).textTheme.labelMedium,
+                      ),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: isBusy ? null : onLoadCards,
+                        child: Text(
+                          '다시 조회',
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(color: AppTheme.primary),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: cards.map((card) {
+                      final isSelected = (selectedCardNo ?? cards.first.cardNo) ==
+                          card.cardNo;
+                      return GestureDetector(
+                        onTap: isBusy ? null : () => onCardSelected(card.cardNo),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 9,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected ? color : AppTheme.surfaceAlt,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${card.cardName} · ${card.cardNo}',
+                            style: Theme.of(context).textTheme.labelLarge
+                                ?.copyWith(
+                                  color: isSelected
+                                      ? Colors.white
+                                      : AppTheme.textPrimary,
+                                ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: isBusy ? null : onSync,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: color,
+                      ),
+                      child: Text(isBusy ? '처리 중...' : '승인내역 불러오기'),
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ],
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: isBusy ? null : onSync,
-                  child: Text(isBusy ? '처리 중...' : '승인내역 불러오기'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: isBusy ? null : onDelete,
-                  child: const Text('연결 해제'),
-                ),
-              ),
-            ],
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final isActive = label == 'ACTIVE';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: isActive
-            ? AppTheme.ok.withValues(alpha: 0.12)
-            : AppTheme.warn.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-          color: isActive ? AppTheme.ok : AppTheme.warn,
-        ),
       ),
     );
   }
 }
 
 class _TransactionTile extends StatelessWidget {
-  const _TransactionTile({required this.transaction});
+  const _TransactionTile({required this.transaction, required this.showDivider});
 
   final CardTransaction transaction;
+  final bool showDivider;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppTheme.line),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppTheme.surfaceAlt,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(
-              Icons.credit_card_rounded,
-              color: AppTheme.primary,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  transaction.merchantName,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${transaction.organizationName} · ${transaction.cardNoMasked}',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  RecordPresenter.relativeDate(transaction.approvedAt),
-                  style: Theme.of(context).textTheme.labelMedium,
-                ),
-                if (transaction.originCurrency != null &&
-                    transaction.originAmount != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    '${transaction.originCurrency} ${transaction.originAmount!.toStringAsFixed(2)}',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.labelMedium?.copyWith(color: AppTheme.primary),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+    final color = _colorForOrganization(transaction.organizationName);
+
+    return Column(
+      children: [
+        if (showDivider) Divider(height: 1, color: AppTheme.line, indent: 16, endIndent: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
             children: [
+              Container(
+                width: 6,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      transaction.merchantName,
+                      style: Theme.of(context).textTheme.titleMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${transaction.organizationName} · ${transaction.cardNoMasked} · ${RecordPresenter.relativeDate(transaction.approvedAt)}',
+                      style: Theme.of(context).textTheme.labelMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
               Text(
                 '₩${NumberFormat('#,##0').format(transaction.amountKrw)}',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
-              const SizedBox(height: 4),
-              Text(
-                transaction.cardName.isEmpty
-                    ? transaction.approvalStatus
-                    : transaction.cardName,
-                style: Theme.of(context).textTheme.labelMedium,
-              ),
             ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
