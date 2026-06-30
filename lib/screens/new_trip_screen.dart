@@ -7,7 +7,9 @@ import 'package:uuid/uuid.dart';
 import '../config/theme.dart';
 import '../models/travel.dart';
 import '../providers/travel_provider.dart';
+import '../providers/travel_selection_provider.dart';
 import '../widgets/header_menu_overlay.dart';
+import 'notification_list_screen.dart';
 import 'settings_screen.dart';
 
 // 나라명(표시용) → 통화 코드
@@ -144,11 +146,12 @@ class _NewTripScreenState extends ConsumerState<NewTripScreen> {
         createdAt: DateTime.now(),
       );
       await ref.read(travelProvider.notifier).add(travel);
+      await ref.read(selectedTravelIdProvider.notifier).select(travel.id);
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('새 여행을 저장했습니다.')));
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(travel.id);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -178,6 +181,14 @@ class _NewTripScreenState extends ConsumerState<NewTripScreen> {
                 padding: const EdgeInsets.only(bottom: 118),
                 children: [
                   _NewTripHeader(
+                    onNotificationTap: () {
+                      setState(() => _isMenuOpen = false);
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const NotificationListScreen(),
+                        ),
+                      );
+                    },
                     onMenuTap: () => setState(() => _isMenuOpen = !_isMenuOpen),
                   ),
                   Padding(
@@ -314,9 +325,13 @@ class _NewTripScreenState extends ConsumerState<NewTripScreen> {
 }
 
 class _NewTripHeader extends StatelessWidget {
-  const _NewTripHeader({required this.onMenuTap});
+  const _NewTripHeader({
+    required this.onMenuTap,
+    required this.onNotificationTap,
+  });
 
   final VoidCallback onMenuTap;
+  final VoidCallback onNotificationTap;
 
   @override
   Widget build(BuildContext context) {
@@ -337,6 +352,8 @@ class _NewTripHeader extends StatelessWidget {
         children: [
           SvgPicture.asset('assets/design/icons/headerLogo.svg', width: 40),
           const Spacer(),
+          HeaderNotificationButton(onTap: onNotificationTap),
+          const SizedBox(width: 8),
           HeaderMenuToggleButton(onTap: onMenuTap),
         ],
       ),

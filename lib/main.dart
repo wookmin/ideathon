@@ -12,7 +12,9 @@ import 'providers/ledger_provider.dart';
 import 'providers/travel_selection_provider.dart';
 import 'providers/travel_provider.dart';
 import 'screens/home_screen.dart';
+import 'screens/travel_list_screen.dart';
 import 'services/camera_service.dart';
+import 'services/notification_history_service.dart';
 import 'utils/map_plugin_initializer.dart';
 
 Future<void> main() async {
@@ -32,6 +34,7 @@ Future<void> main() async {
   await Hive.openBox<ReceiptRecord>(ledgerBoxName);
   await Hive.openBox<Travel>(travelBoxName);
   await Hive.openBox<String>(travelSelectionBoxName);
+  await Hive.openBox<String>(notificationHistoryBoxName);
 
   runApp(const ProviderScope(child: TripReceiptApp()));
 }
@@ -88,26 +91,53 @@ class _AppBootstrapScreenState extends State<_AppBootstrapScreen> {
 
   Future<void> _preparePermissions() async {
     try {
-      final cameraStatus = await Permission.camera.status;
-
-      if (!cameraStatus.isGranted) {
-        final next = await Permission.camera.request();
-        if (next.isGranted) {
-          await CameraService.warmUp();
-        }
-      } else {
-        await CameraService.warmUp();
-      }
-
-      final photoStatus = await Permission.photos.status;
-      if (!photoStatus.isGranted) {
-        await Permission.photos.request();
-      }
+      await _prepareCameraPermission();
+      await _requestIfNeeded(Permission.photos);
+      await _requestIfNeeded(Permission.locationWhenInUse);
+      await _requestIfNeeded(Permission.notification);
     } catch (_) {}
+  }
+
+  Future<void> _prepareCameraPermission() async {
+    final cameraStatus = await Permission.camera.status;
+
+    if (cameraStatus.isGranted) {
+      await CameraService.warmUp();
+      return;
+    }
+
+    final next = await Permission.camera.request();
+    if (next.isGranted) {
+      await CameraService.warmUp();
+    }
+  }
+
+  Future<void> _requestIfNeeded(Permission permission) async {
+    final status = await permission.status;
+    if (status.isGranted || status.isLimited) return;
+    if (status.isPermanentlyDenied || status.isRestricted) return;
+
+    await permission.request();
   }
 
   @override
   Widget build(BuildContext context) {
+    return const _StartupRouter();
+  }
+}
+
+class _StartupRouter extends ConsumerWidget {
+  const _StartupRouter();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final travels = ref.watch(travelProvider);
+    final currentTravel = ref.watch(effectiveTravelProvider);
+
+    if (travels.isEmpty || currentTravel == null) {
+      return const TravelListScreen(startupMode: true);
+    }
+
     return const HomeScreen();
   }
 }

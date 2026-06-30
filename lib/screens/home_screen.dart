@@ -17,6 +17,7 @@ import 'ledger_detail_screen.dart';
 import 'ledger_screen.dart';
 import 'manual_entry_screen.dart';
 import 'scan_screen.dart';
+import 'notification_list_screen.dart';
 import 'settings_screen.dart';
 import 'travel_list_screen.dart';
 
@@ -71,6 +72,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   status: selectedTravel != null
                       ? displayStatusForTravel(selectedTravel)
                       : RecordPresenter.statusLabel(records),
+                  onNotificationTap: () {
+                    setState(() => _isMenuOpen = false);
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationListScreen(),
+                      ),
+                    );
+                  },
                   onMenuTap: () {
                     setState(() => _isMenuOpen = !_isMenuOpen);
                   },

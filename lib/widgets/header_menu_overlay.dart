@@ -10,6 +10,7 @@ class AppTopHeader extends StatelessWidget {
     required this.period,
     required this.status,
     required this.onMenuTap,
+    this.onNotificationTap,
     this.onBackTap,
   });
 
@@ -19,6 +20,7 @@ class AppTopHeader extends StatelessWidget {
   final String period;
   final String status;
   final VoidCallback onMenuTap;
+  final VoidCallback? onNotificationTap;
   final VoidCallback? onBackTap;
 
   @override
@@ -51,6 +53,10 @@ class AppTopHeader extends StatelessWidget {
                 semanticsLabel: '멈칫',
               ),
               const Spacer(),
+              if (onNotificationTap != null) ...[
+                HeaderNotificationButton(onTap: onNotificationTap!),
+                const SizedBox(width: 8),
+              ],
               HeaderMenuToggleButton(onTap: onMenuTap),
             ],
           ),
@@ -109,6 +115,28 @@ class _HeaderStatusChip extends StatelessWidget {
         style: Theme.of(
           context,
         ).textTheme.labelSmall?.copyWith(color: AppTheme.primary),
+      ),
+    );
+  }
+}
+
+class HeaderNotificationButton extends StatelessWidget {
+  const HeaderNotificationButton({super.key, required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: const Padding(
+        padding: EdgeInsets.all(4),
+        child: Icon(
+          Icons.notifications_none_rounded,
+          size: 28,
+          color: AppTheme.primary,
+        ),
       ),
     );
   }

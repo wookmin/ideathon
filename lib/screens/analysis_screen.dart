@@ -13,6 +13,7 @@ import '../utils/record_presenter.dart';
 import '../widgets/header_menu_overlay.dart';
 import '../widgets/main_bottom_nav.dart';
 import 'home_screen.dart';
+import 'notification_list_screen.dart';
 import 'settings_screen.dart';
 import 'travel_list_screen.dart';
 
@@ -62,6 +63,14 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                     Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(builder: (_) => const HomeScreen()),
                       (route) => route.isFirst,
+                    );
+                  },
+                  onNotificationTap: () {
+                    setState(() => _isMenuOpen = false);
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationListScreen(),
+                      ),
                     );
                   },
                   onMenuTap: () {

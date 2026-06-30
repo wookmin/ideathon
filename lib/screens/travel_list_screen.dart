@@ -12,10 +12,14 @@ import '../utils/record_presenter.dart';
 import '../widgets/header_menu_overlay.dart';
 import '../widgets/main_bottom_nav.dart';
 import 'new_trip_screen.dart';
+import 'home_screen.dart';
+import 'notification_list_screen.dart';
 import 'settings_screen.dart';
 
 class TravelListScreen extends ConsumerStatefulWidget {
-  const TravelListScreen({super.key});
+  const TravelListScreen({super.key, this.startupMode = false});
+
+  final bool startupMode;
 
   @override
   ConsumerState<TravelListScreen> createState() => _TravelListScreenState();
@@ -42,7 +46,9 @@ class _TravelListScreenState extends ConsumerState<TravelListScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFE),
-      bottomNavigationBar: const MainBottomNav(currentIndex: 1),
+      bottomNavigationBar: widget.startupMode
+          ? null
+          : const MainBottomNav(currentIndex: 1),
       body: SafeArea(
         child: Stack(
           children: [
@@ -58,6 +64,14 @@ class _TravelListScreenState extends ConsumerState<TravelListScreen> {
                   status: selectedTravel != null
                       ? displayStatusForTravel(selectedTravel)
                       : RecordPresenter.statusLabel(records),
+                  onNotificationTap: () {
+                    setState(() => _isMenuOpen = false);
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationListScreen(),
+                      ),
+                    );
+                  },
                   onMenuTap: () => setState(() => _isMenuOpen = !_isMenuOpen),
                 ),
                 Padding(
@@ -77,12 +91,17 @@ class _TravelListScreenState extends ConsumerState<TravelListScreen> {
                       SizedBox(
                         height: 52,
                         child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const NewTripScreen(),
-                              ),
-                            );
+                          onPressed: () async {
+                            final createdTravelId = await Navigator.of(context)
+                                .push<String>(
+                                  MaterialPageRoute(
+                                    builder: (_) => const NewTripScreen(),
+                                  ),
+                                );
+                            if (!context.mounted) return;
+                            if (widget.startupMode && createdTravelId != null) {
+                              _openHome(context);
+                            }
                           },
                           icon: const Icon(Icons.add_rounded, size: 24),
                           label: const Text('새 여행 추가'),
@@ -208,13 +227,11 @@ class _TravelListScreenState extends ConsumerState<TravelListScreen> {
                                     .read(selectedTravelIdProvider.notifier)
                                     .select(travel.id);
                                 if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      '${travel.title}을(를) 메인 여행으로 적용했어요.',
-                                    ),
-                                  ),
-                                );
+                                if (widget.startupMode) {
+                                  _openHome(context);
+                                  return;
+                                }
+                                Navigator.of(context).pop();
                               },
                               onDelete: () async {
                                 final confirmed = await showDialog<bool>(
@@ -282,6 +299,13 @@ class _TravelListScreenState extends ConsumerState<TravelListScreen> {
       ),
     );
   }
+}
+
+void _openHome(BuildContext context) {
+  Navigator.of(context).pushAndRemoveUntil(
+    MaterialPageRoute(builder: (_) => const HomeScreen()),
+    (route) => false,
+  );
 }
 
 class _TravelCard extends StatelessWidget {

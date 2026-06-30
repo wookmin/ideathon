@@ -11,6 +11,7 @@ import '../models/receipt_record.dart';
 import '../utils/budget_alert_presenter.dart';
 import '../utils/record_presenter.dart';
 import '../widgets/header_menu_overlay.dart';
+import 'notification_list_screen.dart';
 import 'settings_screen.dart';
 import 'travel_list_screen.dart';
 
@@ -168,6 +169,14 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
                       ? displayStatusForTravel(selectedTravel)
                       : RecordPresenter.statusLabel(records),
                   onBackTap: () => Navigator.of(context).maybePop(),
+                  onNotificationTap: () {
+                    setState(() => _isMenuOpen = false);
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationListScreen(),
+                      ),
+                    );
+                  },
                   onMenuTap: () {
                     setState(() => _isMenuOpen = !_isMenuOpen);
                   },
