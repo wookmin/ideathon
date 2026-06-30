@@ -14,6 +14,7 @@ import 'providers/travel_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/travel_list_screen.dart';
 import 'services/camera_service.dart';
+import 'services/demo_seed_service.dart';
 import 'services/local_notification_service.dart';
 import 'services/notification_history_service.dart';
 import 'utils/map_plugin_initializer.dart';
@@ -37,6 +38,7 @@ Future<void> main() async {
   await Hive.openBox<Travel>(travelBoxName);
   await Hive.openBox<String>(travelSelectionBoxName);
   await Hive.openBox<String>(notificationHistoryBoxName);
+  await DemoSeedService.seedJapanTrip();
 
   runApp(const ProviderScope(child: TripReceiptApp()));
 }

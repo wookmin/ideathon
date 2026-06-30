@@ -94,7 +94,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
               ),
             ),
           ),
-          const MainBottomNav(currentIndex: 0),
+          const MainBottomNav(currentIndex: 1),
         ],
       ),
       body: SafeArea(
@@ -227,6 +227,15 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
+        IconButton(
+          onPressed: () => Navigator.of(context).maybePop(),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          color: AppTheme.textPrimary,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+          tooltip: '뒤로가기',
+        ),
+        const SizedBox(width: 8),
         const CircleAvatar(
           radius: 18,
           backgroundColor: AppTheme.surfaceAlt,
@@ -256,6 +265,10 @@ class _LedgerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final flagPrefix = record.countryCode.length == 2
+        ? '${RecordPresenter.flag(record.countryCode)} '
+        : '';
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(22),
@@ -283,7 +296,7 @@ class _LedgerCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${RecordPresenter.flag(record.countryCode)} ${RecordPresenter.title(record)}',
+                    '$flagPrefix${RecordPresenter.title(record)}',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 4),
@@ -317,49 +330,10 @@ class _LedgerCard extends StatelessWidget {
                   '₩${NumberFormat('#,##0').format(RecordPresenter.totalWithTip(record))}',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
-                const SizedBox(height: 6),
-                _VerdictPill(verdict: record.verdict),
               ],
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _VerdictPill extends StatelessWidget {
-  const _VerdictPill({required this.verdict});
-
-  final String verdict;
-
-  @override
-  Widget build(BuildContext context) {
-    Color color;
-    String label;
-    switch (verdict) {
-      case 'fair':
-        color = AppTheme.ok;
-        label = '합리적';
-      case 'pricey':
-        color = AppTheme.warn;
-        label = '주의';
-      case 'rip':
-        color = AppTheme.bad;
-        label = '의심';
-      default:
-        color = AppTheme.textSecondary;
-        label = '보류';
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: color),
       ),
     );
   }

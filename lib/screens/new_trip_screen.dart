@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import '../config/theme.dart';
 import '../models/travel.dart';
+import '../providers/exchange_provider.dart';
 import '../providers/travel_provider.dart';
 import '../providers/travel_selection_provider.dart';
-import '../widgets/header_menu_overlay.dart';
-import 'notification_list_screen.dart';
-import 'settings_screen.dart';
+import '../services/exchange_service.dart';
 
 // 나라명(표시용) → 통화 코드
 const _countries = [
@@ -67,7 +65,6 @@ class _NewTripScreenState extends ConsumerState<NewTripScreen> {
   String? _selectedCountry;
   String _targetCurrency = 'USD';
   bool _saving = false;
-  bool _isMenuOpen = false;
 
   @override
   void initState() {
@@ -157,6 +154,34 @@ class _NewTripScreenState extends ConsumerState<NewTripScreen> {
     }
   }
 
+  String? _budgetExchangeLabel(
+    double budgetKrw,
+    ExchangeRatesSnapshot? snapshot,
+  ) {
+    if (_selectedCountry == null || budgetKrw <= 0) return null;
+
+    final currency = _targetCurrency.toUpperCase();
+    if (currency == 'KRW') {
+      return '약 ₩${NumberFormat('#,##0').format(budgetKrw)}';
+    }
+
+    final rate = snapshot?.rateFor(currency) ?? 0;
+    if (rate <= 0) return null;
+
+    final amount = budgetKrw * rate;
+    final formatter = NumberFormat(
+      _usesDecimalCurrency(currency) ? '#,##0.##' : '#,##0',
+    );
+    return '약 ${formatter.format(amount)} $currency';
+  }
+
+  bool _usesDecimalCurrency(String currency) {
+    return switch (currency.toUpperCase()) {
+      'JPY' || 'KRW' || 'VND' || 'IDR' => false,
+      _ => true,
+    };
+  }
+
   double? _parseNumber(String raw) {
     final cleaned = raw.trim().replaceAll(',', '');
     if (cleaned.isEmpty) return null;
@@ -169,6 +194,11 @@ class _NewTripScreenState extends ConsumerState<NewTripScreen> {
     final travelDays = _endDate.difference(_startDate).inDays + 1;
     final dailyBudget = travelDays <= 0 ? 0 : budgetKrw / travelDays;
     final currencyFormatter = NumberFormat('#,##0');
+    final exchangeSnapshot = ref.watch(exchangeRatesProvider).valueOrNull;
+    final budgetExchangeLabel = _budgetExchangeLabel(
+      budgetKrw,
+      exchangeSnapshot,
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFE),
@@ -180,17 +210,7 @@ class _NewTripScreenState extends ConsumerState<NewTripScreen> {
               child: ListView(
                 padding: const EdgeInsets.only(bottom: 118),
                 children: [
-                  _NewTripHeader(
-                    onNotificationTap: () {
-                      setState(() => _isMenuOpen = false);
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const NotificationListScreen(),
-                        ),
-                      );
-                    },
-                    onMenuTap: () => setState(() => _isMenuOpen = !_isMenuOpen),
-                  ),
+                  const _NewTripHeader(),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 38, 20, 0),
                     child: Column(
@@ -253,7 +273,26 @@ class _NewTripScreenState extends ConsumerState<NewTripScreen> {
                           ],
                         ),
                         const SizedBox(height: 34),
-                        _SectionLabel(label: '예산 정하기'),
+                        Row(
+                          children: [
+                            const _SectionLabel(label: '예산 정하기'),
+                            if (budgetExchangeLabel != null) ...[
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  budgetExchangeLabel,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        color: const Color(0xFF7B8095),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                         const SizedBox(height: 10),
                         _BudgetInputCard(
                           controller: _budgetController,
@@ -302,21 +341,6 @@ class _NewTripScreenState extends ConsumerState<NewTripScreen> {
                 ),
               ),
             ),
-            HeaderMenuOverlay(
-              isOpen: _isMenuOpen,
-              dimTopOffset: 68,
-              onDismiss: () => setState(() => _isMenuOpen = false),
-              onTravelTap: () {
-                setState(() => _isMenuOpen = false);
-                Navigator.of(context).maybePop();
-              },
-              onSettingsTap: () {
-                setState(() => _isMenuOpen = false);
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                );
-              },
-            ),
           ],
         ),
       ),
@@ -325,19 +349,14 @@ class _NewTripScreenState extends ConsumerState<NewTripScreen> {
 }
 
 class _NewTripHeader extends StatelessWidget {
-  const _NewTripHeader({
-    required this.onMenuTap,
-    required this.onNotificationTap,
-  });
-
-  final VoidCallback onMenuTap;
-  final VoidCallback onNotificationTap;
+  const _NewTripHeader();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 68,
-      padding: const EdgeInsets.fromLTRB(20, 0, 28, 0),
+      height: 56,
+      alignment: Alignment.centerLeft,
+      padding: const EdgeInsets.only(left: 4),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -348,14 +367,11 @@ class _NewTripHeader extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          SvgPicture.asset('assets/design/icons/headerLogo.svg', width: 40),
-          const Spacer(),
-          HeaderNotificationButton(onTap: onNotificationTap),
-          const SizedBox(width: 8),
-          HeaderMenuToggleButton(onTap: onMenuTap),
-        ],
+      child: IconButton(
+        onPressed: () => Navigator.of(context).maybePop(),
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+        color: const Color(0xFF07126C),
+        tooltip: '뒤로가기',
       ),
     );
   }

@@ -14,7 +14,7 @@ class AppTopHeader extends StatelessWidget {
     this.onBackTap,
   });
 
-  static const double menuDimTopOffset = 94;
+  static const double menuDimTopOffset = 112;
 
   final String travelTitle;
   final String period;
@@ -68,31 +68,35 @@ class AppTopHeader extends StatelessWidget {
           const SizedBox(height: 12),
           Padding(
             padding: EdgeInsets.only(left: hasBackButton ? 22 : 0),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Flexible(
-                  child: Text(
-                    travelTitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleMedium?.copyWith(color: AppTheme.primary),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    period,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF7C879B),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        travelTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(color: AppTheme.primary),
+                      ),
                     ),
+                    const SizedBox(width: 10),
+                    _HeaderStatusChip(status: status),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  period,
+                  maxLines: 1,
+                  overflow: TextOverflow.visible,
+                  softWrap: false,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFF7C879B),
+                    fontSize: 12,
                   ),
                 ),
-                const SizedBox(width: 10),
-                _HeaderStatusChip(status: status),
               ],
             ),
           ),

@@ -40,6 +40,16 @@ class ExchangeService {
     'SGD',
     'GBP',
     'AUD',
+    'CHF',
+    'NZD',
+    'CAD',
+    'MYR',
+    'PHP',
+    'IDR',
+    'INR',
+    'TRY',
+    'MXN',
+    'BRL',
   ];
 
   Future<ExchangeRatesSnapshot> getRates() async {
