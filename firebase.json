@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "zeroback-5ff31-496614",
+    "site": "mumchit-prod-20260630",
     "public": "build/web",
     "ignore": [
       "firebase.json",

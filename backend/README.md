@@ -38,6 +38,54 @@ npm run dev
 - `CODEF_CLIENT_SECRET`
 - `CODEF_PUBLIC_KEY`
 
+## Deploy on Cloud Run
+
+이 서버는 Cloud Run에 맞게 `PORT` 환경변수를 사용합니다. 루트 URL은 Flutter 앱의 `cloudBackendBaseUrl`에 이미 Cloud Run 주소로 설정되어 있습니다.
+
+1. `backend/cloudrun-env.yaml`을 만듭니다. 이 파일은 git에 올리지 않습니다.
+
+```yaml
+NODE_ENV: production
+ALLOWED_ORIGINS: ""
+CODEF_ENV: development
+CODEF_CLIENT_ID: "..."
+CODEF_CLIENT_SECRET: "..."
+CODEF_PUBLIC_KEY: "..."
+APP_ENCRYPTION_SECRET: "..."
+GOOGLE_PLACES_API_KEY: "..."
+```
+
+2. Cloud Run에 배포합니다.
+
+```bash
+gcloud run deploy tripreceipt-backend \
+  --source backend \
+  --region asia-northeast3 \
+  --allow-unauthenticated \
+  --min-instances 1 \
+  --env-vars-file backend/cloudrun-env.yaml
+```
+
+3. 배포 후 헬스체크를 확인합니다.
+
+```bash
+curl https://tripreceipt-backend-593945546381.asia-northeast3.run.app/health
+```
+
+응답이 `{ "ok": true }`이면 정상입니다.
+
+Cloud Run URL이 바뀌면 Flutter 실행/빌드 때 아래처럼 지정하거나 `lib/config/env.dart`의 `cloudBackendBaseUrl`을 교체합니다.
+
+```bash
+flutter run --dart-define=BACKEND_BASE_URL=https://<cloud-run-url>
+```
+
+릴리즈 빌드도 같은 값을 넘기면 됩니다.
+
+```bash
+flutter build ios --dart-define=BACKEND_BASE_URL=https://<cloud-run-url>
+```
+
 ## Temporary auth model
 
 MVP 기준으로 간단히 `x-user-id` 헤더를 사용합니다.

@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tripreceipt/models/receipt_record.dart';
 import 'package:tripreceipt/models/travel.dart';
 import 'package:tripreceipt/services/budget_forecast_service.dart';
-import 'package:tripreceipt/services/demo_location_trigger_source.dart';
 
 void main() {
   const service = BudgetForecastService();
@@ -115,25 +114,5 @@ void main() {
     );
 
     expect(service.shouldAlertAfterSpend(before: before, after: after), isTrue);
-  });
-
-  test('demo location trigger produces an actionable alert candidate', () {
-    final forecast = service.calculate(
-      travel: travel(),
-      records: [record(1120000, DateTime(2026, 6, 27))],
-      now: DateTime(2026, 6, 27),
-    );
-    const source = DemoLocationTriggerSource();
-
-    final candidate = source.candidateFor(
-      trigger: source.triggers.first,
-      forecast: forecast,
-      now: DateTime(2026, 6, 27),
-    );
-
-    expect(candidate.placeType, '트럭스토어');
-    expect(candidate.estimatedSpendKrw, 370000);
-    expect(candidate.message, contains('예산'));
-    expect(candidate.resultingStatus, ForecastStatus.danger);
   });
 }

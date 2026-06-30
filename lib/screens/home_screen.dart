@@ -10,9 +10,11 @@ import '../models/receipt_record.dart';
 import '../providers/ledger_provider.dart';
 import '../providers/travel_selection_provider.dart';
 import '../services/budget_forecast_service.dart';
+import '../utils/budget_pace.dart';
 import '../utils/record_presenter.dart';
 import '../widgets/header_menu_overlay.dart';
 import '../widgets/main_bottom_nav.dart';
+import 'budget_forecast_detail_screen.dart';
 import 'ledger_detail_screen.dart';
 import 'ledger_screen.dart';
 import 'manual_entry_screen.dart';
@@ -99,7 +101,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => const TravelListScreen(),
+                              builder: (_) =>
+                                  const BudgetForecastDetailScreen(),
                             ),
                           );
                         },
@@ -225,6 +228,7 @@ class _TripHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final dayLabel = _dayLabel;
     final caption = _caption;
+    final tripDay = sustainableTripDay(forecast);
 
     return Material(
       color: Colors.transparent,
@@ -286,13 +290,39 @@ class _TripHeroCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  RichText(
-                    text: TextSpan(
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(color: Colors.white, height: 1.08),
-                      children: [TextSpan(text: dayLabel)],
+                  if (tripDay != null) ...[
+                    Text(
+                      '이 속도라면 남은 예산으로',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.labelSmall?.copyWith(color: Colors.white70),
                     ),
-                  ),
+                    const SizedBox(height: 4),
+                    RichText(
+                      text: TextSpan(
+                        style: Theme.of(context).textTheme.headlineMedium
+                            ?.copyWith(color: Colors.white, height: 1.08),
+                        children: [
+                          TextSpan(text: '$tripDay일 째'),
+                          TextSpan(
+                            text: ' 까지 갈 수 있어요',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else
+                    RichText(
+                      text: TextSpan(
+                        style: Theme.of(context).textTheme.headlineMedium
+                            ?.copyWith(color: Colors.white, height: 1.08),
+                        children: [TextSpan(text: dayLabel)],
+                      ),
+                    ),
                   const SizedBox(height: 7),
                   Row(
                     children: [
@@ -326,12 +356,22 @@ class _TripHeroCard extends StatelessWidget {
   String get _dayLabel {
     if (forecast.travel == null) return '여행 준비';
     if (forecast.elapsedDays <= 0) return '출발 전';
+    final tripDay = sustainableTripDay(forecast);
+    if (tripDay != null) return '$tripDay일째';
     return '${forecast.elapsedDays}일째';
   }
 
   String get _caption {
     if (forecast.travel == null) {
       return '여행을 추가하고 예산 알림을 시작해요';
+    }
+    final tripDay = sustainableTripDay(forecast);
+    if (tripDay != null) {
+      final shortfall = forecast.totalDays - tripDay;
+      if (shortfall > 0) {
+        return '여행 종료까지 ${forecast.totalDays}일 | $shortfall일 부족';
+      }
+      return '이 속도면 여행 끝까지 예산이 충분해요';
     }
     if (forecast.remainingDays <= 1) {
       return '여행 마지막 날까지 예산을 확인해요';
@@ -362,7 +402,7 @@ class _BudgetSummaryCards extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: _BudgetSummaryCard(
-            label: '적정 예산',
+            label: '하루 적정',
             value: _formatWon(safeBudgetKrw),
           ),
         ),
