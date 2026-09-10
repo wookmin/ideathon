@@ -18,9 +18,9 @@ import 'budget_forecast_detail_screen.dart';
 import 'ledger_detail_screen.dart';
 import 'ledger_screen.dart';
 import 'manual_entry_screen.dart';
-import 'scan_screen.dart';
 import 'notification_list_screen.dart';
 import 'settings_screen.dart';
+import 'toss_pay_screen.dart';
 import 'travel_list_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -114,6 +114,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         remainingKrw: math.max(0, budget - totalKrw),
                         safeBudgetKrw: forecast.safeDailyBudgetKrw,
                       ),
+                      const SizedBox(height: 20),
+                      TossPayEntryCard(
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const TossPayScreen(),
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 30),
                       Row(
                         children: [
@@ -193,11 +201,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       isScrollControlled: true,
       builder: (bottomSheetContext) {
         return _AddExpenseSheet(
-          onScanTap: () {
+          onTossPayTap: () {
             Navigator.of(bottomSheetContext).pop();
             Navigator.of(
               context,
-            ).push(MaterialPageRoute(builder: (_) => const ScanScreen()));
+            ).push(MaterialPageRoute(builder: (_) => const TossPayScreen()));
           },
           onManualTap: () {
             Navigator.of(bottomSheetContext).pop();
@@ -647,7 +655,7 @@ class _EmptyRecentCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '영수증 스캔이나 직접 입력으로 첫 지출을 추가해 주세요.',
+            '멈칫 안에서 토스페이로 결제하거나 직접 기록해 주세요.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium,
           ),
@@ -664,9 +672,12 @@ class _EmptyRecentCard extends StatelessWidget {
 }
 
 class _AddExpenseSheet extends StatelessWidget {
-  const _AddExpenseSheet({required this.onScanTap, required this.onManualTap});
+  const _AddExpenseSheet({
+    required this.onTossPayTap,
+    required this.onManualTap,
+  });
 
-  final VoidCallback onScanTap;
+  final VoidCallback onTossPayTap;
   final VoidCallback onManualTap;
 
   @override
@@ -708,10 +719,10 @@ class _AddExpenseSheet extends StatelessWidget {
                   child: _ActionCard(
                     backgroundColor: AppTheme.primary,
                     iconBackground: Colors.white.withValues(alpha: 0.14),
-                    icon: Icons.photo_camera_outlined,
-                    label: '영수증 스캔',
+                    icon: Icons.account_balance_wallet_outlined,
+                    label: '토스페이 결제',
                     labelColor: Colors.white,
-                    onTap: onScanTap,
+                    onTap: onTossPayTap,
                   ),
                 ),
                 const SizedBox(width: 14),

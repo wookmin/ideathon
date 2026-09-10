@@ -19,6 +19,14 @@ const envSchema = z.object({
 
   // 추가
   GOOGLE_PLACES_API_KEY: z.string().min(1, 'GOOGLE_PLACES_API_KEY is required'),
+
+  // Apps in Toss mTLS credentials. Keep the files outside the repository.
+  TOSS_MTLS_CERT_PATH: z.string().default(''),
+  TOSS_MTLS_KEY_PATH: z.string().default(''),
+  TOSS_PAY_BASE_URL: z
+    .string()
+    .url()
+    .default('https://pay-apps-in-toss-api.toss.im'),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -53,4 +61,5 @@ export const appEnv = {
     .filter(Boolean),
   codefApiBaseUrl: codefApiBaseUrlByEnv[env.CODEF_ENV],
   codefOauthBaseUrl: codefOauthBaseUrlByEnv[env.CODEF_ENV],
+  tossPayBaseUrl: env.TOSS_PAY_BASE_URL.replace(/\/$/, ''),
 };

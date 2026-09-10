@@ -15,6 +15,16 @@ npm run build
 
 빌드가 성공하면 이 폴더에 `<appName>.ait`가 생성됩니다.
 
+## 배포
+
+`ait/.env.local`의 `AIT_CONSOLE_API_KEY`에 앱인토스 콘솔에서 발급한 콘솔 API 키를 입력한 뒤 실행합니다.
+
+```bash
+npm run deploy
+```
+
+콘솔 API 키는 `.ait` 번들에 포함되지 않고 배포 명령에서만 사용됩니다.
+
 ## 포함된 앱인토스 브리지
 
 `src/ait-bridge.ts`는 Flutter Web에서 사용할 수 있도록 다음 기능을 `window.aitBridge`로 노출합니다.

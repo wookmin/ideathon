@@ -7,7 +7,7 @@
     "build:bridge": "vite build --config vite.bridge.config.ts",
     "assemble": "node scripts/assemble.mjs",
     "build": "npm run build:flutter && npm run build:bridge && npm run assemble && ait build",
-    "deploy": "ait deploy"
+    "deploy": "node scripts/deploy.mjs"
   },
   "dependencies": {
     "@apps-in-toss/web-framework": "^3.4.0"

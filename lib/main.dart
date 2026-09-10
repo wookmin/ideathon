@@ -14,7 +14,6 @@ import 'providers/travel_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/travel_list_screen.dart';
 import 'services/camera_service.dart';
-import 'services/demo_seed_service.dart';
 import 'services/local_notification_service.dart';
 import 'services/notification_history_service.dart';
 import 'utils/map_plugin_initializer.dart';
@@ -38,9 +37,28 @@ Future<void> main() async {
   await Hive.openBox<Travel>(travelBoxName);
   await Hive.openBox<String>(travelSelectionBoxName);
   await Hive.openBox<String>(notificationHistoryBoxName);
-  await DemoSeedService.seedJapanTrip();
-
+  await _removeLegacyDemoData();
   runApp(const ProviderScope(child: TripReceiptApp()));
+}
+
+Future<void> _removeLegacyDemoData() async {
+  final travelBox = Hive.box<Travel>(travelBoxName);
+  final ledgerBox = Hive.box<ReceiptRecord>(ledgerBoxName);
+  final selectionBox = Hive.box<String>(travelSelectionBoxName);
+
+  const legacyTravelId = 'demo_japan_week_trip';
+  await travelBox.delete(legacyTravelId);
+
+  final legacyRecordKeys = ledgerBox.keys
+      .where((key) => key.toString().startsWith('demo_japan_'))
+      .toList();
+  if (legacyRecordKeys.isNotEmpty) {
+    await ledgerBox.deleteAll(legacyRecordKeys);
+  }
+
+  if (selectionBox.get(selectedTravelIdKey) == legacyTravelId) {
+    await selectionBox.delete(selectedTravelIdKey);
+  }
 }
 
 class TripReceiptApp extends StatelessWidget {
@@ -49,7 +67,7 @@ class TripReceiptApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'JustAMoment',
+      title: '멈칫',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.theme,
       home: const _AppBootstrapScreen(),
