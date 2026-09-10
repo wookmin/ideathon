@@ -76,6 +76,10 @@ backend/cloudrun-env.yaml
 backend/*.env.yaml
 backend/*service-account*.json
 backend/*credentials*.json
+ait/node_modules/
+ait/dist/
+ait/bridge-dist/
+ait/*.ait
 android/app/google-services.json
 ios/Runner/GoogleService-Info.plist
 macos/Runner/GoogleService-Info.plist
